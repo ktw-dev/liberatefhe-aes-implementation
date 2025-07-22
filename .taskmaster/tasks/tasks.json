@@ -1,0 +1,144 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "프로젝트 초기 설정 및 디렉토리 구조 생성",
+        "description": "AES-128 ECB 모드 구현을 위한 프로젝트 초기 설정 및 필요한 파일들 생성",
+        "details": "프로젝트 루트 디렉토리에 다음 파일들을 생성: aes-main-process.py, aes-block-array.py, aes-key-array.py, aes-split-to-nibble.py, aes-key-scheduling.py, aes-addroundkey.py, aes-ShiftRows.py, aes-MixColumns.py, aes-SubBytes.py. 각 파일에 기본 구조와 docstring을 포함. numpy 의존성 확인 및 import 문 추가.",
+        "testStrategy": "모든 파일이 올바르게 생성되었는지 확인하고, numpy import가 정상적으로 작동하는지 테스트",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "데이터 블록 배열 구현 (aes-block-array.py)",
+        "description": "최대 2048개 블록을 column-major 형태로 처리하는 1차원 배열 생성 함수 구현",
+        "details": "PRD에 명시된 레이아웃을 따라 블록 패킹 함수 구현: (N, 16) 형태의 입력을 (16 * max_blocks,) 형태로 변환. 각 바이트 위치별로 모든 블록의 해당 바이트를 연속적으로 배치. max_blocks 초과시 ValueError 발생, 부족시 0으로 패딩. numpy.reshape 사용 금지, indexing 제한 준수.",
+        "testStrategy": "다양한 크기의 입력 블록으로 테스트하여 올바른 레이아웃 생성 확인, 경계 조건 테스트 (max_blocks 초과, 0개 블록 등)",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "키 배열 구현 (aes-key-array.py)",
+        "description": "평문 레이아웃과 일치하는 플랫 키 배열 생성 함수 구현",
+        "details": "16바이트 AES 키를 입력받아 (16 * max_blocks,) 크기의 1차원 배열로 변환. 각 키 바이트를 max_blocks번 반복하여 배치: [k0*2048, k1*2048, ..., k15*2048]. AddRoundKey에서 np.bitwise_xor 연산이 가능하도록 평문 배열과 동일한 구조로 생성.",
+        "testStrategy": "16바이트 키 입력으로 올바른 크기와 패턴의 배열 생성 확인, 다른 블록 수에 대한 테스트",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "니블 분할 구현 (aes-split-to-nibble.py)",
+        "description": "8비트 값을 4비트 니블로 분할하는 함수 구현",
+        "details": "각 바이트를 상위 4비트와 하위 4비트로 분할하는 함수 구현. 입력 배열의 각 원소에 대해 (value >> 4) & 0xF와 value & 0xF로 분할. 두 개의 별도 numpy 배열로 반환하여 병렬 처리 지원. numpy.reshape 사용 금지 제약 조건 준수.",
+        "testStrategy": "다양한 바이트 값으로 니블 분할 정확성 확인, 분할된 니블을 다시 합쳐서 원본과 일치하는지 검증",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "키 스케줄링 구현 (aes-key-scheduling.py)",
+        "description": "AES-128 라운드 키 생성 알고리즘 구현",
+        "details": "128비트 마스터 키로부터 11개의 라운드 키 생성. RotWord, SubWord, Rcon 함수 구현하여 AES 키 확장 알고리즘 적용. 각 라운드 키를 플랫 배열 형태로 생성하여 병렬 AddRoundKey 연산 지원. S-box 테이블 포함.",
+        "testStrategy": "표준 AES 테스트 벡터로 라운드 키 정확성 검증, 각 라운드별 키 값 확인",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "in-progress",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "AddRoundKey 구현 (aes-addroundkey.py)",
+        "description": "라운드 키와 상태의 XOR 연산 구현",
+        "details": "플랫 배열 형태의 상태와 라운드 키에 대해 np.bitwise_xor 연산 수행. 모든 블록에 대해 병렬적으로 AddRoundKey 적용. 입력과 출력 모두 (16 * max_blocks,) 형태 유지.",
+        "testStrategy": "단일 블록과 다중 블록에 대한 XOR 연산 정확성 확인, 라운드 키 적용 전후 상태 비교",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          3,
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "SubBytes 구현 (aes-SubBytes.py)",
+        "description": "S-box를 이용한 바이트 치환 연산 구현",
+        "details": "AES S-box 테이블을 이용한 바이트 치환 구현. 니블 기반 처리를 위해 4비트 단위로 S-box 접근. 상위 니블을 행 인덱스, 하위 니블을 열 인덱스로 사용. 모든 블록에 대해 병렬 처리 지원. sbox 기반 indexing은 예외적으로 허용.",
+        "testStrategy": "표준 S-box 값으로 치환 정확성 확인, 역변환 테스트로 일관성 검증",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "ShiftRows 구현 (aes-ShiftRows.py)",
+        "description": "행별 순환 시프트 연산 구현",
+        "details": "4x4 상태 행렬의 각 행에 대해 좌측 순환 시프트 수행: 1행 1바이트, 2행 2바이트, 3행 3바이트 시프트. 플랫 배열에서 column-major 순서를 고려하여 올바른 인덱스 계산. numpy.reshape 금지 제약 하에서 구현.",
+        "testStrategy": "4x4 상태 블록에 대한 시프트 패턴 확인, 역변환으로 원본 복구 테스트",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "MixColumns 구현 (aes-MixColumns.py)",
+        "description": "갈루아 필드 연산을 이용한 열 혼합 구현",
+        "details": "GF(2^8) 필드에서의 행렬 곱셈 구현. 각 열에 대해 [02, 03, 01, 01; 01, 02, 03, 01; 01, 01, 02, 03; 03, 01, 01, 02] 행렬과 곱셈. 갈루아 필드 곱셈 함수 구현 (xtime 연산 포함). 플랫 배열 형태에서 직접 연산 수행.",
+        "testStrategy": "표준 테스트 벡터로 MixColumns 연산 정확성 확인, InvMixColumns로 역변환 테스트",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "메인 AES 프로세스 구현 (aes-main-process.py)",
+        "description": "전체 AES-128 ECB 암호화 프로세스 통합",
+        "details": "모든 AES 연산을 통합하여 완전한 AES-128 ECB 암호화 구현. 초기 AddRoundKey, 9라운드의 SubBytes-ShiftRows-MixColumns-AddRoundKey, 마지막 라운드의 SubBytes-ShiftRows-AddRoundKey 순서로 실행. 최대 2048개 블록 병렬 처리 지원. 입력 검증 및 예외 처리 포함.",
+        "testStrategy": "NIST 표준 테스트 벡터로 전체 암호화 프로세스 검증, 다양한 블록 수에 대한 성능 및 정확성 테스트, 복호화 구현으로 원본 복구 확인",
+        "priority": "high",
+        "dependencies": [
+          6,
+          7,
+          8,
+          9
+        ],
+        "status": "in-progress",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-20T04:03:47.085Z",
+      "updated": "2025-07-20T04:23:01.450Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
