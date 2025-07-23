@@ -80,6 +80,7 @@ beta  = transform_to_zeta(beta_int)
 # -----------------------------------------------------------------------------
 # 2. Initialise engine & keys
 # -----------------------------------------------------------------------------
+print("[INFO] Initialising engine …")
 engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
 secret_key    = engine.create_secret_key()
 public_key    = engine.create_public_key(secret_key)
@@ -89,6 +90,7 @@ conjugate_key = engine.create_conjugation_key(secret_key)  # might be unused dir
 # -----------------------------------------------------------------------------
 # 3. Encrypt inputs
 # -----------------------------------------------------------------------------
+print("[INFO] Encrypting inputs …")
 enc_alpha = engine.encrypt(alpha, public_key)
 enc_beta  = engine.encrypt(beta,  public_key)
 
