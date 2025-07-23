@@ -12,7 +12,6 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-from aes_transform_zeta import transform_to_zeta  # pylint: disable=import-error
 from desilofhe import Engine  # pylint: disable=import-error
 
 # -----------------------------------------------------------------------------
@@ -26,6 +25,10 @@ COEFFS_JSON = Path(__file__).with_name("fft_coeffs.json")
 # Utility functions
 # -----------------------------------------------------------------------------
 
+def transform_to_zeta(arr: np.ndarray) -> np.ndarray:
+    result = np.exp(-2j * np.pi * (arr % 16) / 16)
+    return result
+
 def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
     """Inverse of `transform_to_zeta` assuming unit-magnitude complex numbers.
 
@@ -37,13 +40,28 @@ def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
     return k
 
 
-def build_power_basis(engine: Engine, ct, relin_key, public_key):
-    """Return list of ciphertexts ct^k for k = 0..DEGREE."""
-    basis = [engine.encrypt(np.ones(SLOT_COUNT), public_key)]  # k = 0
-    basis.append(ct)                                           # k = 1
-    for k in range(2, DEGREE + 1):
-        new_ct = engine.multiply(basis[-1], ct, relin_key)
-        basis.append(new_ct)
+def build_power_basis(engine: Engine, ct, relin_key, conj_key, public_key):
+    """Return dict exp→ct for exponents 0‥15 using power_basis + conjugates.
+
+    Steps:
+    1. `engine.make_power_basis(ct, 8, relin_key)` → ct^1..ct^8.
+    2. Conjugate the first 7 powers to obtain ct^-1..ct^-7 ≡ ct^15..ct^9.
+    3. Add exponent 0 as an encryption of the all-ones vector.
+    """
+    # Positive powers 1..8
+    pos_basis = engine.make_power_basis(ct, 8, relin_key)  # list length 8
+
+    basis: Dict[int, object] = {}
+    basis[0] = engine.encrypt(np.ones(SLOT_COUNT), public_key)
+
+    for idx, c in enumerate(pos_basis, start=1):
+        basis[idx] = c  # exponents 1..8
+
+    # Negative powers: ct^-k  (k=1..7) → ct^(16-k)
+    for k in range(1, 8):
+        conj_ct = engine.conjugate(pos_basis[k - 1], conj_key)  # ct^-k
+        basis[16 - k] = conj_ct  # exponents 15..9
+
     return basis
 
 
@@ -78,24 +96,28 @@ enc_beta  = engine.encrypt(beta,  public_key)
 # 4. Build power bases
 # -----------------------------------------------------------------------------
 print("[INFO] Building power bases …")
-base_x = build_power_basis(engine, enc_alpha, relin_key, public_key)
-base_y = build_power_basis(engine, enc_beta,  relin_key, public_key)
+base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key, public_key)
+base_y = build_power_basis(engine, enc_beta,  relin_key, conjugate_key, public_key)
 
 # -----------------------------------------------------------------------------
 # 5. Load polynomial coefficients (sparse)
 # -----------------------------------------------------------------------------
 print("[INFO] Loading polynomial coefficients …")
 with open(COEFFS_JSON, "r", encoding="utf-8") as f:
-    coeff_data = json.load(f)
+    data = json.load(f)
+
+# entries are [[i, j, real, imag], ...]
+entries = data.get("entries", [])
 
 # Dict[(i, j)] -> complex
 coeffs: Dict[Tuple[int, int], complex] = {}
-for entry in coeff_data:
-    i = int(entry["x_exp"])
-    j = int(entry["y_exp"])
-    c = complex(entry["real"], entry["imag"])
-    if c != 0:
-        coeffs[(i, j)] = c
+for entry in entries:
+    if len(entry) != 4:
+        continue
+    i, j, real_val, imag_val = entry
+    c = complex(real_val, imag_val)
+    if abs(c) > 0:
+        coeffs[(int(i), int(j))] = c
 
 print(f"[INFO] Non-zero coefficients loaded: {len(coeffs)} (≈{len(coeffs)/(DEGREE+1)**2:.2%})")
 
