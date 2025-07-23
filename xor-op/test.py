@@ -121,6 +121,14 @@ for entry in entries:
 
 print(f"[INFO] Non-zero coefficients loaded: {len(coeffs)} (≈{len(coeffs)/(DEGREE+1)**2:.2%})")
 
+# enc_alpha / basis_x[1] 복호해 보기
+print("alpha[0:5] =", alpha_int[:5])
+print("dec alpha  =", zeta_to_int(engine.decrypt(enc_alpha, secret_key)[:5]))
+
+for k in [1, 2, 3]:
+    print(f"⟨x^{k}⟩[0] =", engine.decrypt(base_x[k], secret_key)[0])
+    print(f"⟨y^{k}⟩[0] =", engine.decrypt(base_y[k], secret_key)[0])
+    
 # -----------------------------------------------------------------------------
 # 6. Evaluate polynomial securely
 # -----------------------------------------------------------------------------
