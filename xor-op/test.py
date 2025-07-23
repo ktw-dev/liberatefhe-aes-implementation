@@ -100,7 +100,15 @@ beta  = transform_to_zeta(beta_int)
 # 2. Initialise engine & keys
 # -----------------------------------------------------------------------------
 print("[INFO] Initialising engine …")
-engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
+# engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
+
+engine = Engine(
+            max_level=30,
+            mode="parallel",
+            thread_count=8,
+            device_id=0
+        )
+
 secret_key    = engine.create_secret_key()
 public_key    = engine.create_public_key(secret_key)
 relin_key     = engine.create_relinearization_key(secret_key)
