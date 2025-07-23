@@ -137,11 +137,6 @@ zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
 cipher_res = zero_ct
 
 for (i, j), coeff in coeffs.items():
-    # Skip constant term, we'll handle later to enable angle decoding
-    if i == 0 and j == 0:
-        const_coeff = coeff  # remember 7.5
-        continue
-
     term = engine.multiply(base_x[i], base_y[j], relin_key)
 
     # Real component (scalar multiply)
