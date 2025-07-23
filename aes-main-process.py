@@ -77,20 +77,29 @@ aes_transform_zeta = _load_module("aes-transform-zeta.py", "aes_transform_zeta")
 
 def engine_initiation() -> FHEContext:
     """Create engine and all keys, returning a bundled FHEContext."""
+    
     print("create engine with cpu mode, log_coeff_count=16, special_prime_count=1\n")
     engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
+    
     print("create secret key\n")
     secret_key = engine.create_secret_key()
+    
     print("create public key\n")
     public_key = engine.create_public_key(secret_key)
+    
     print("create rotation key. This will take 30s over\n")
     rotation_key = engine.create_rotation_key(secret_key)
+    
     print("create relinearization key\n")
     relinearization_key = engine.create_relinearization_key(secret_key)
+    
     print("create conjugation key\n")
     conjugation_key = engine.create_conjugation_key(secret_key)
+    
     print("create small bootstrap key\n")
     small_bootstrap_key = engine.create_small_bootstrap_key(secret_key)
+    
+    
     print("engine initiation complete!!!\n")
 
     return FHEContext(
