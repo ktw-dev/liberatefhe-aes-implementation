@@ -40,6 +40,21 @@ def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
     return k
 
 
+def ones_cipher(engine: Engine, template_ct):
+    """Return ciphertext with all slots = 1 matching scale/level of template_ct."""
+    # Create zero ciphertext with same scale/level via scalar multiply
+    zero_ct = engine.multiply(template_ct, 0.0)  # keeps params, slots all 0
+
+    try:
+        # Preferred path if library supports add_plain
+        ones_ct = engine.add_plain(zero_ct, 1.0)
+    except AttributeError:
+        # Fallback: encode plaintext ones then add as ciphertext-plaintext
+        ones_pt = engine.encode(np.ones(SLOT_COUNT))
+        ones_ct = engine.add(zero_ct, ones_pt)
+    return ones_ct
+
+
 def build_power_basis(engine: Engine, ct, relin_key, conj_key, public_key):
     """Return dict exp→ct for exponents 0‥15 using power_basis + conjugates.
 
@@ -52,7 +67,7 @@ def build_power_basis(engine: Engine, ct, relin_key, conj_key, public_key):
     pos_basis = engine.make_power_basis(ct, 8, relin_key)  # list length 8
 
     basis: Dict[int, object] = {}
-    basis[0] = engine.encrypt(np.ones(SLOT_COUNT), public_key)
+    basis[0] = ones_cipher(engine, ct)
 
     for idx, c in enumerate(pos_basis, start=1):
         basis[idx] = c  # exponents 1..8
@@ -100,6 +115,9 @@ enc_beta  = engine.encrypt(beta,  public_key)
 print("[INFO] Building power bases …")
 base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key, public_key)
 base_y = build_power_basis(engine, enc_beta,  relin_key, conjugate_key, public_key)
+
+print("[DEBUG] sorted(base_x.keys()) =", sorted(base_x.keys()))
+print("[DEBUG] sorted(base_y.keys()) =", sorted(base_y.keys()))
 
 # -----------------------------------------------------------------------------
 # 5. Load polynomial coefficients (sparse)
