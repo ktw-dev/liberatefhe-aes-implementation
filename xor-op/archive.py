@@ -210,7 +210,7 @@ print("[INFO] Decrypting …")
 decoded_zeta = engine.decrypt(cipher_res, secret_key)
 
 # decoded_int = zeta_to_int(decoded_zeta)
-decoded_int = np.rint(decoded_zeta.astype(np.int8))
+decoded_int = np.round(decoded_zeta).astype(np.int8)
 
 try:
     np.testing.assert_array_equal(decoded_int, expected_int)

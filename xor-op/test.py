@@ -142,17 +142,6 @@ for entry in entries:
     c = complex(real_val, imag_val)
     if abs(c) > 0:
         coeffs[(int(i), int(j))] = c
-
-print(f"[INFO] Non-zero coefficients loaded: {len(coeffs)} (≈{len(coeffs)/(DEGREE+1)**2:.2%})")
-
-# enc_alpha / basis_x[1] 복호해 보기
-print("[DEBUG]: Line 149-151")
-print("alpha[0:5] =", alpha_int[:5])
-print("dec alpha  =", zeta_to_int(engine.decrypt(enc_alpha, secret_key)[:5]))
-
-for k in [1, 2, 3]:
-    print(f"⟨x^{k}⟩[0] =", engine.decrypt(base_x[k], secret_key)[0])
-    print(f"⟨y^{k}⟩[0] =", engine.decrypt(base_y[k], secret_key)[0])
     
 # -----------------------------------------------------------------------------
 # Plaintext verification of polynomial (no HE) for first few slots
@@ -164,8 +153,7 @@ for (i, j), coeff in coeffs.items():
 
 unit_plain = plain_results / np.abs(plain_results)
 plain_int = zeta_to_int(unit_plain[:20])
-print("[DEBUG] plain_int first 20 =", plain_int)
-print("[DEBUG] expected_int first 20 =", expected_int[:20])
+
 
 # -----------------------------------------------------------------------------
 # 6. Evaluate polynomial securely
@@ -193,9 +181,6 @@ for (i, j), coeff in coeffs.items():
         term_total  = real_ct
 
     cipher_res = engine.add(cipher_res, term_total)
-    print_term_debug(f"term ({i},{j})", term_total)
-
-print_term_debug("after poly", cipher_res)
 
 # -----------------------------------------------------------------------------
 # 7. Decrypt & verify
