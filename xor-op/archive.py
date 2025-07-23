@@ -1,3 +1,7 @@
+"""
+이 코드의 경우 16차 단위근 평면 상의 좌표에서 fft를 통해 얻은 계수를 사용하여 이변수 다항식을 구하고 있는 상태(즉, fft 보간). 근데 이렇게 하면 ζ^ (k a + ℓ b) 를 계산했을 때 실제로는 f(a,b) (정수 XOR) 를 “실수값”으로 복원해 버림. 즉 도메인이 바뀌어버리기 때문에 계산 과정이 불편해지는 문제가 발생함. 이것은 아카이브화하여 나중에 교육자료로 활용할 것
+"""
+
 import json
 import os
 import sys
@@ -19,7 +23,7 @@ from desilofhe import Engine  # pylint: disable=import-error
 # -----------------------------------------------------------------------------
 SLOT_COUNT = 32768  # 2^15
 DEGREE      = 15    # Maximum exponent needed for XOR polynomial
-COEFFS_JSON = Path(__file__).with_name("xor_mono_coeffs.json")
+COEFFS_JSON = Path(__file__).with_name("fft_coeffs.json")
 
 # -----------------------------------------------------------------------------
 # Utility functions
@@ -162,7 +166,8 @@ plain_results = np.zeros(SLOT_COUNT, dtype=complex)
 for (i, j), coeff in coeffs.items():
     plain_results += coeff * (alpha ** i) * (beta ** j)
 
-unit_plain = plain_results / np.abs(plain_results)
+plain_results_minus_const = plain_results - coeffs.get((0, 0), 0)
+unit_plain = plain_results_minus_const / np.abs(plain_results_minus_const)
 plain_int = zeta_to_int(unit_plain[:20])
 print("[DEBUG] plain_int first 20 =", plain_int)
 print("[DEBUG] expected_int first 20 =", expected_int[:20])
@@ -193,17 +198,19 @@ for (i, j), coeff in coeffs.items():
         term_total  = real_ct
 
     cipher_res = engine.add(cipher_res, term_total)
-    print_term_debug(f"term ({i},{j})", term_total)
+    #print_term_debug(f"term ({i},{j})", term_total)
 
-print_term_debug("after poly", cipher_res)
+# ── 루프 끝 바로 뒤 (상수항 빼기 전후 비교)
+print_term_debug("sum w/o const", cipher_res)
 
 # -----------------------------------------------------------------------------
 # 7. Decrypt & verify
 # -----------------------------------------------------------------------------
 print("[INFO] Decrypting …")
 decoded_zeta = engine.decrypt(cipher_res, secret_key)
-unit_dec = decoded_zeta / np.abs(decoded_zeta)
-decoded_int = zeta_to_int(unit_dec)
+
+# decoded_int = zeta_to_int(decoded_zeta)
+decoded_int = np.rint(decoded_zeta.astype(np.int8))
 
 try:
     np.testing.assert_array_equal(decoded_int, expected_int)
