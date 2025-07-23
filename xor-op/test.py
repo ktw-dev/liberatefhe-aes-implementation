@@ -79,6 +79,10 @@ def build_power_basis(engine: Engine, ct, relin_key, conj_key, public_key):
 
     return basis
 
+def print_term_debug(tag: str, ct):
+    tmp = engine.decrypt(ct, secret_key)[:10]      # 앞 10개 샘플
+    ang = np.round((-np.angle(tmp) * 16) / (2*np.pi)) % 16
+    print(f"{tag:<15} phase={ang.astype(int)}  abs≈{np.abs(tmp)[:3]}")
 
 # -----------------------------------------------------------------------------
 # 1. Prepare inputs
@@ -156,7 +160,8 @@ print("[INFO] Evaluating XOR polynomial …")
 zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
 cipher_res = zero_ct
 
-for (i, j), coeff in coeffs.items():
+for idx, (i, j), coeff in coeffs.items():
+    
     term = engine.multiply(base_x[i], base_y[j], relin_key)
 
     # Real component (scalar multiply)
@@ -174,12 +179,19 @@ for (i, j), coeff in coeffs.items():
         term_total  = real_ct
 
     cipher_res = engine.add(cipher_res, term_total)
+    print_term_debug(f"term ({i},{j})", term_total)
+
+# ── 루프 끝 바로 뒤 (상수항 빼기 전후 비교)
+print_term_debug("sum w/o const", cipher_res)
 
 # Subtract constant coefficient so result lies on unit circle for angle decoding
 if (const_val := coeffs.get((0, 0))) is not None:
     ones_ct = base_x[0]  # encryption of ones
     const_ct = engine.multiply(ones_ct, const_val.real)  # purely real
     cipher_res = engine.subtract(cipher_res, const_ct)
+
+# ── 상수항 빼고 난 뒤
+print_term_debug("after const", cipher_res)
 
 # -----------------------------------------------------------------------------
 # 7. Decrypt & verify
