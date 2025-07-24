@@ -167,10 +167,10 @@ if __name__ == "__main__":
         device_id=0
     )
 
-    public_key = engine.public_key
-    secret_key = engine.secret_key
-    relinearization_key = engine.relinearization_key
-    conjugation_key = engine.conjugation_key
+    secret_key    = engine.create_secret_key()
+    public_key    = engine.create_public_key(secret_key)
+    relinearization_key     = engine.create_relinearization_key(secret_key)
+    conjugation_key = engine.create_conjugation_key(secret_key)  # might be unused directly   
     engine_context = FHEContext(engine, public_key, secret_key, relinearization_key, conjugation_key)
     
     # 1. Encrypt inputs

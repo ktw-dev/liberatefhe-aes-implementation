@@ -153,16 +153,25 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
         raise ValueError("num_blocks must be between 1 and 2048 inclusive")
 
     rng = rng or np.random.default_rng()
+
+    # 1. Generate random data-blocks
     blocks = rng.integers(0, 256, size=(num_blocks, 16), dtype=np.uint8)
 
+    # 2. Flatten to 1-D array following batching layout
     flat = aes_block_array.blocks_to_flat_array(blocks)
+
+    # 3. Split each byte into upper / lower 4-bit nibbles
     upper, lower = aes_split_to_nibble.split_to_nibbles(flat)
 
-    # ζ-변환 (SIMD-style) – repeatable vectorized op
+    # 4. ζ-변환 (SIMD-style) – repeatable vectorized op
     zeta_upper = aes_transform_zeta.transform_to_zeta(upper)
     zeta_lower = aes_transform_zeta.transform_to_zeta(lower)
+    
+    # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
+    zeta_upper_list = [zeta_upper[i:i+2048] for i in range(0, len(zeta_upper), 2048)]
+    zeta_lower_list = [zeta_lower[i:i+2048] for i in range(0, len(zeta_lower), 2048)]
 
-    return blocks, flat, upper, lower, zeta_upper, zeta_lower
+    return blocks, flat, upper, lower, zeta_upper_list, zeta_lower_list
 
 # -----------------------------------------------------------------------------
 # Key initiation --------------------------------------------------------------
@@ -190,8 +199,12 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
 
     key_zeta_upper = aes_transform_zeta.transform_to_zeta(key_upper)
     key_zeta_lower = aes_transform_zeta.transform_to_zeta(key_lower)
+    
+    # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
+    key_zeta_upper_list = [key_zeta_upper[i:i+2048] for i in range(0, len(key_zeta_upper), 2048)]
+    key_zeta_lower_list = [key_zeta_lower[i:i+2048] for i in range(0, len(key_zeta_lower), 2048)]
 
-    return key, key_flat, key_upper, key_lower, key_zeta_upper, key_zeta_lower
+    return key, key_flat, key_upper, key_lower, key_zeta_upper_list, key_zeta_lower_list
 
 # -----------------------------------------------------------------------------
 # Utility: stage completion ----------------------------------------------------
@@ -234,27 +247,34 @@ if __name__ == "__main__":
     wait_next_stage("Engine Initiation", "Data initiation")
     
     # --- Data initiation stage ------------------------------------------------
-    blocks, flat, hi, lo, zeta_hi, zeta_lo = data_initiation(n_blocks)
+    blocks, flat, _, _, zeta_hi_list, zeta_lo_list = data_initiation(n_blocks)
 
     print("Generated", len(blocks), "block(s)")
     print("First block bytes (hex):", [f"{b:02X}" for b in blocks[0]] if blocks.size else [])
     print("Flat array sample (0-15):", [f"{b:02X}" for b in flat[:16]])
-    print("Upper nibbles (0-15)   :", [f"{b:X}" for b in hi[:16]])
-    print("Lower nibbles (0-15)   :", [f"{b:X}" for b in lo[:16]])
-    print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in zeta_hi[:4]])
-    print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in zeta_lo[:4]])
+    print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in zeta_hi_list[0][:4]])
+    print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in zeta_lo_list[0][:4]])
 
     wait_next_stage("Data initiation", "key initiation")
 
     # --- Key initiation stage -------------------------------------------------
-    key_bytes, key_flat, key_high_nibble, key_low_nibble, key_zeta_hi, key_zeta_lo = key_initiation()
+    key_bytes, key_flat, _, _, key_zeta_hi_list, key_zeta_lo_list = key_initiation()
 
     print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
-    print("Key upper nibbles (0-15):", [f"{b:X}" for b in key_high_nibble[:16]])
-    print("Key lower nibbles (0-15):", [f"{b:X}" for b in key_low_nibble[:16]])
-    print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
-    print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
+
+    print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi_list[0][:4]])
+    print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo_list[0][:4]])
 
     wait_next_stage("Key initiation", "key Scheduling")
 
     # --- key Scheduling stage -------------------------------------------------
+
+
+
+
+    # --- AddRoundKey stage ----------------------------------------------------
+    
+    
+    
+    
+    # Stage 1: SubBytes
