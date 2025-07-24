@@ -207,6 +207,19 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
     return key, key_flat, key_upper, key_lower, key_zeta_upper_list, key_zeta_lower_list
 
 # -----------------------------------------------------------------------------
+# Key Scheduling --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+def key_scheduling(engine_context, key_zeta_hi_list, key_zeta_lo_list):
+    pass
+
+
+
+
+
+
+
+# -----------------------------------------------------------------------------
 # Utility: stage completion ----------------------------------------------------
 # -----------------------------------------------------------------------------
 
@@ -249,6 +262,7 @@ if __name__ == "__main__":
     # --- Data initiation stage ------------------------------------------------
     blocks, flat, _, _, zeta_hi_list, zeta_lo_list = data_initiation(n_blocks)
 
+    # DEBUG
     print("Generated", len(blocks), "block(s)")
     print("First block bytes (hex):", [f"{b:02X}" for b in blocks[0]] if blocks.size else [])
     print("Flat array sample (0-15):", [f"{b:02X}" for b in flat[:16]])
@@ -260,12 +274,13 @@ if __name__ == "__main__":
     # --- Key initiation stage -------------------------------------------------
     key_bytes, key_flat, _, _, key_zeta_hi_list, key_zeta_lo_list = key_initiation()
 
+    # DEBUG
     print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
 
     print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi_list[0][:4]])
     print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo_list[0][:4]])
 
-    wait_next_stage("Key initiation", "key Scheduling")
+    wait_next_stage("Key initiation", "data/key HE-encryption")
     
     # --- data HE-encryption stage ------------------------------------------------
     
@@ -277,11 +292,11 @@ if __name__ == "__main__":
     enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
     enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
     
-    # DEBUG
-    print(enc_zeta_hi_list)
-    print(enc_zeta_lo_list)
-    print(enc_key_hi_list)
-    print(enc_key_lo_list)
+    # # DEBUG
+    # print(enc_zeta_hi_list)
+    # print(enc_zeta_lo_list)
+    # print(enc_key_hi_list)
+    # print(enc_key_lo_list)
     
     # --- key HE-encryption stage ------------------------------------------------
     
@@ -289,13 +304,13 @@ if __name__ == "__main__":
     enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
     enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
     
-    # DEBUG
-    print(enc_key_hi_list)
-    print(enc_key_lo_list)
+    # # DEBUG
+    # print(enc_key_hi_list)
+    # print(enc_key_lo_list)
     
-
+    wait_next_stage("data/key HE-encryption", "key Scheduling")
+    
     # --- key Scheduling stage -------------------------------------------------
-
 
 
 
