@@ -13,6 +13,9 @@ import logging.handlers
 from collections import OrderedDict
 import warnings
 
+import time
+import math
+
 Scalar = Union[int, float, complex]
 
 def setup_logging():
@@ -72,14 +75,14 @@ class XORPaperOptimized:
         self.public_key = self.engine.create_public_key(self.secret_key)
         self.relin_key = self.engine.create_relinearization_key(self.secret_key)
         self.conj_key = self.engine.create_conjugation_key(self.secret_key)
-        self.rotation_key = self.engine.create_rotation_key(self.secret_key)
-        self.fixed_rotation_keys = {}
-        rotation_deltas = [1, 2, 4, 8, 16]
-        for delta in rotation_deltas:
-            if delta < self.engine.slot_count:
-                self.fixed_rotation_keys[delta] = self.engine.create_fixed_rotation_key(
-                    self.secret_key, delta
-                )
+        # self.rotation_key = self.engine.create_rotation_key(self.secret_key)
+        # self.fixed_rotation_keys = {}
+        # rotation_deltas = [1, 2, 4, 8, 16]
+        # for delta in rotation_deltas:
+        #     if delta < self.engine.slot_count:
+        #         self.fixed_rotation_keys[delta] = self.engine.create_fixed_rotation_key(
+        #             self.secret_key, delta
+        #         )
         key_gen_time = time.time() - start_time
         logger.info(f"FHE key generation completed in {key_gen_time:.2f} seconds")
         self.scale = 2 ** config.precision_bits
@@ -727,7 +730,9 @@ class SimdXorWrapper:
         hi = self.core.decode_array(hi_dec, 4)
         lo = self.core.decode_array(lo_dec, 4)
         return (hi << 4) | lo
-cfg = XORConfig(thread_count=16 precision_bits=40)
+    
+start_time = time.time()
+cfg = XORConfig(thread_count=16, precision_bits=40)
 xor_core = XORPaperOptimized(cfg)
 
 simdxor = SimdXorWrapper(xor_core, use_fast=False, noise_reduce=False)
@@ -750,4 +755,5 @@ expected_int = np.bitwise_xor(a_plain, b_plain)
 
 print(f"check: {np.all(c_plain == expected_int)}")
 
-
+end_time = time.time()
+print(f"[INFO] Time taken: {end_time - start_time:.2f} seconds")

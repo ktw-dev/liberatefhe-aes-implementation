@@ -4,6 +4,9 @@ import sys
 from pathlib import Path
 from typing import Dict, Tuple
 
+import time
+import math
+
 import numpy as np
 
 # -----------------------------------------------------------------------------
@@ -87,6 +90,8 @@ def print_term_debug(tag: str, ct):
 # -----------------------------------------------------------------------------
 # 1. Prepare inputs
 # -----------------------------------------------------------------------------
+start_time = time.time()
+
 np.random.seed(42)
 alpha_int = np.random.randint(0, 16, size=SLOT_COUNT, dtype=np.uint8)
 beta_int  = np.random.randint(0, 16, size=SLOT_COUNT, dtype=np.uint8)
@@ -163,25 +168,52 @@ unit_plain = plain_results / np.abs(plain_results)
 plain_int = zeta_to_int(unit_plain[:20])
 
 
+# # -----------------------------------------------------------------------------
+# # 6. Evaluate polynomial securely
+# # -----------------------------------------------------------------------------
+# print("[INFO] Evaluating XOR polynomial …")
+# zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
+# complex_terms: list[tuple[object, complex]] = []
+
+# for (i, j), coeff in coeffs.items():
+#     # Pre-computed power bases are stored in base_x / base_y
+#     term = engine.multiply(base_x[i], base_y[j], relin_key)
+#     complex_terms.append((term, coeff))
+
+# cipher_res = zero_ct  # no real terms present
+
+# # Add complex-coefficient terms one by one
+# for term, coeff in complex_terms:
+#     coeff_pt = engine.encode(np.full(SLOT_COUNT, coeff, dtype=complex))
+#     term_res = engine.multiply(term, coeff_pt)
+#     cipher_res = engine.add(cipher_res, term_res)
+    
 # -----------------------------------------------------------------------------
-# 6. Evaluate polynomial securely
+# 6. Evaluate polynomial securely -- ver.2
 # -----------------------------------------------------------------------------
 print("[INFO] Evaluating XOR polynomial …")
 zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
-complex_terms: list[tuple[object, complex]] = []
+cipher_res = zero_ct
 
 for (i, j), coeff in coeffs.items():
-    # Pre-computed power bases are stored in base_x / base_y
+    
     term = engine.multiply(base_x[i], base_y[j], relin_key)
-    complex_terms.append((term, coeff))
 
-cipher_res = zero_ct  # no real terms present
+    # Real component (scalar multiply)
+    real_part = coeff.real
+    real_ct   = engine.multiply(term, real_part)
 
-# Add complex-coefficient terms one by one
-for term, coeff in complex_terms:
-    coeff_pt = engine.encode(np.full(SLOT_COUNT, coeff, dtype=complex))
-    term_res = engine.multiply(term, coeff_pt)
-    cipher_res = engine.add(cipher_res, term_res)
+    # Imag component (plaintext vector multiply)
+    imag_part = coeff.imag
+    if imag_part != 0:
+        imag_vector = np.full(SLOT_COUNT, imag_part * 1j, dtype=complex)
+        imag_pt     = engine.encode(imag_vector)
+        imag_ct     = engine.multiply(term, imag_pt)
+        term_total  = engine.add(real_ct, imag_ct)
+    else:
+        term_total  = real_ct
+
+    cipher_res = engine.add(cipher_res, term_total)
 
 # -----------------------------------------------------------------------------
 # 7. Decrypt & verify
@@ -198,3 +230,6 @@ except AssertionError as err:
     mismatch = np.count_nonzero(decoded_int != expected_int)
     print(f"[FAIL] XOR result mismatch in {mismatch}/{SLOT_COUNT} slots.")
     raise err 
+
+end_time = time.time()
+print(f"[INFO] Time taken: {end_time - start_time:.2f} seconds")
