@@ -403,10 +403,10 @@ class XORPaperOptimized:
                 
                 complex_terms.append((x_powers[0], coeff))
                 continue
-            elif idx_i == 0:
-                term = y_powers[idx_j]
-            elif idx_j == 0:
-                term = x_powers[idx_i]
+            # elif idx_i == 0:
+            #     term = y_powers[idx_j]
+            # elif idx_j == 0:
+            #     term = x_powers[idx_i] # 두 변수 중 하나의 지수가 0인 경우는 없음. 해당 케이스는 없음.
             else:
                 term = self.engine.multiply(x_powers[idx_i], y_powers[idx_j], self.relin_key)
                 self.dbg_level(f"x^{idx_i} * y^{idx_j}", term)
@@ -727,14 +727,15 @@ class SimdXorWrapper:
         hi = self.core.decode_array(hi_dec, 4)
         lo = self.core.decode_array(lo_dec, 4)
         return (hi << 4) | lo
-cfg = XORConfig(thread_count=16, precision_bits=40)
+cfg = XORConfig(thread_count=16 precision_bits=40)
 xor_core = XORPaperOptimized(cfg)
 
 simdxor = SimdXorWrapper(xor_core, use_fast=False, noise_reduce=False)
 
 # ── ① 입력 준비 (평문 → 암호문) ──────────────────────────
-a_plain = np.array([0x3F, 0x27, 0xAA], dtype=np.uint8)
-b_plain = np.array([0x95, 0xCD, 0xAA], dtype=np.uint8)
+np.random.seed(42)
+a_plain = np.random.randint(0, 16, size=16*2048, dtype=np.uint8)
+b_plain  = np.random.randint(0, 16, size=16*2048, dtype=np.uint8)
 
 a_pack = simdxor.pack(a_plain, level=22)
 b_pack = simdxor.pack(b_plain, level=22)
@@ -745,6 +746,8 @@ c_pack = simdxor.xor(a_pack, b_pack)
 
 c_plain = simdxor.unpack(c_pack, length=len(a_plain))
 print("A ⊕ B =", c_plain)              
+expected_int = np.bitwise_xor(a_plain, b_plain)
 
+print(f"check: {np.all(c_plain == expected_int)}")
 
 

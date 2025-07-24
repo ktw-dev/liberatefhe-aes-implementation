@@ -79,7 +79,13 @@ def engine_initiation() -> FHEContext:
     """Create engine and all keys, returning a bundled FHEContext."""
     
     print("create engine with cpu mode, log_coeff_count=16, special_prime_count=1\n")
-    engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
+    # engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
+    engine = Engine(
+            # max_level=30, # 이 값은 조절해도 되는지 따로 확인할 것. [tag: check]
+            mode="parallel",
+            thread_count=8,
+            device_id=0
+        ) # 훨씬 빠름
     
     print("create secret key\n")
     secret_key = engine.create_secret_key()

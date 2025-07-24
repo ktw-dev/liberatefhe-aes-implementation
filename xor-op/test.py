@@ -168,27 +168,36 @@ plain_int = zeta_to_int(unit_plain[:20])
 # -----------------------------------------------------------------------------
 print("[INFO] Evaluating XOR polynomial …")
 zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
-cipher_res = zero_ct
+
+# ── New evaluation using weighted_sum (real coefficients) ───────────────
+real_terms: list[object] = []
+real_weights: list[float] = []  # index 1..N  (index 0 = const 0.0 added later)
+complex_terms: list[tuple[object, complex]] = []
 
 for (i, j), coeff in coeffs.items():
-    
+    # Pre-computed power bases are stored in base_x / base_y
     term = engine.multiply(base_x[i], base_y[j], relin_key)
 
-    # Real component (scalar multiply)
-    real_part = coeff.real
-    real_ct   = engine.multiply(term, real_part)
-
-    # Imag component (plaintext vector multiply)
-    imag_part = coeff.imag
-    if imag_part != 0:
-        imag_vector = np.full(SLOT_COUNT, imag_part * 1j, dtype=complex)
-        imag_pt     = engine.encode(imag_vector)
-        imag_ct     = engine.multiply(term, imag_pt)
-        term_total  = engine.add(real_ct, imag_ct)
+    if abs(coeff.imag) < 1e-14:
+        # Real coefficient → accumulate for weighted_sum
+        real_terms.append(term)
+        real_weights.append(float(coeff.real))
     else:
-        term_total  = real_ct
+        # Complex coefficient → accumulate for separate processing
+        complex_terms.append((term, coeff))
 
-    cipher_res = engine.add(cipher_res, term_total)
+# Perform weighted_sum for real-coefficient terms
+if real_terms:
+    # weighted_sum expects weights[0] to be the constant term (here 0.0)
+    cipher_res = engine.weighted_sum(real_terms, [0.0] + real_weights)
+else:
+    cipher_res = zero_ct  # no real terms present
+
+# Add complex-coefficient terms one by one
+for term, coeff in complex_terms:
+    coeff_pt = engine.encode(np.full(SLOT_COUNT, coeff, dtype=complex))
+    term_res = engine.multiply(term, coeff_pt)
+    cipher_res = engine.add(cipher_res, term_res)
 
 # -----------------------------------------------------------------------------
 # 7. Decrypt & verify

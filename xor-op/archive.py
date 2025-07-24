@@ -203,6 +203,33 @@ for (i, j), coeff in coeffs.items():
 # ── 루프 끝 바로 뒤 (상수항 빼기 전후 비교)
 print_term_debug("sum w/o const", cipher_res)
 
+# # -----------------------------------------------------------------------------
+# # 6. Evaluate polynomial securely -- ver.2
+# # -----------------------------------------------------------------------------
+# print("[INFO] Evaluating XOR polynomial …")
+# zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
+# cipher_res = zero_ct
+
+# for (i, j), coeff in coeffs.items():
+    
+#     term = engine.multiply(base_x[i], base_y[j], relin_key)
+
+#     # Real component (scalar multiply)
+#     real_part = coeff.real
+#     real_ct   = engine.multiply(term, real_part)
+
+#     # Imag component (plaintext vector multiply)
+#     imag_part = coeff.imag
+#     if imag_part != 0:
+#         imag_vector = np.full(SLOT_COUNT, imag_part * 1j, dtype=complex)
+#         imag_pt     = engine.encode(imag_vector)
+#         imag_ct     = engine.multiply(term, imag_pt)
+#         term_total  = engine.add(real_ct, imag_ct)
+#     else:
+#         term_total  = real_ct
+
+#     cipher_res = engine.add(cipher_res, term_total)
+
 # -----------------------------------------------------------------------------
 # 7. Decrypt & verify
 # -----------------------------------------------------------------------------
