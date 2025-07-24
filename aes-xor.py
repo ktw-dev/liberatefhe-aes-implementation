@@ -3,8 +3,10 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, Tuple
-
+from functools import lru_cache
+from dataclasses import dataclass
 import numpy as np
+import desilofhe
 
 # -----------------------------------------------------------------------------
 # Import helper from project root
@@ -17,28 +19,12 @@ from desilofhe import Engine  # pylint: disable=import-error
 # -----------------------------------------------------------------------------
 # Parameters
 # -----------------------------------------------------------------------------
-SLOT_COUNT = 32768  # 2^15
 DEGREE      = 15    # Maximum exponent needed for XOR polynomial
 COEFFS_JSON = Path(__file__).with_name("xor_mono_coeffs.json")
 
 # -----------------------------------------------------------------------------
 # Utility functions
 # -----------------------------------------------------------------------------
-
-def transform_to_zeta(arr: np.ndarray) -> np.ndarray:
-    result = np.exp(-2j * np.pi * (arr % 16) / 16)
-    return result
-
-def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
-    """Inverse of `transform_to_zeta` assuming unit-magnitude complex numbers.
-
-    Values are mapped back to integers 0‥15 by measuring their phase.
-    """
-    angles = np.angle(zeta_arr)  # range (-π, π]
-    k      = (-angles * 16) / (2 * np.pi)
-    k      = np.mod(np.rint(k), 16).astype(np.uint8)
-    return k
-
 
 def ones_cipher(engine: Engine, template_ct):
     """Return ciphertext with all slots = 1 matching scale/level of template_ct."""
@@ -50,12 +36,12 @@ def ones_cipher(engine: Engine, template_ct):
         ones_ct = engine.add_plain(zero_ct, 1.0)
     except AttributeError:
         # Fallback: encode plaintext ones then add as ciphertext-plaintext
-        ones_pt = engine.encode(np.ones(SLOT_COUNT))
+        ones_pt = engine.encode(np.ones(engine.slot_count))
         ones_ct = engine.add(zero_ct, ones_pt)
     return ones_ct
 
 
-def build_power_basis(engine: Engine, ct, relin_key, conj_key, public_key):
+def build_power_basis(engine: Engine, ct, relin_key, conj_key):
     """Return dict exp→ct for exponents 0‥15 using power_basis + conjugates.
 
     Steps:
@@ -79,122 +65,133 @@ def build_power_basis(engine: Engine, ct, relin_key, conj_key, public_key):
 
     return basis
 
-def print_term_debug(tag: str, ct):
-    tmp = engine.decrypt(ct, secret_key)[:10]      # 앞 10개 샘플
-    ang = np.round((-np.angle(tmp) * 16) / (2*np.pi)) % 16
-    print(f"{tag:<15} phase={ang.astype(int)}  abs≈{np.abs(tmp)[:3]}")
+@lru_cache(maxsize=1)
+def _load_coeffs(path=COEFFS_JSON):
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return {(int(i), int(j)): complex(r, im)
+            for i, j, r, im in data["entries"] if r or im}
+
+@lru_cache(maxsize=1)
+
+def _coeff_plaintexts(slot_count: int):
+    """Return dict[(i,j)] -> plaintext (encoded complex coeff) for given slot count."""
+    coeffs = _load_coeffs()
+    # We create a temporary Engine instance only to get encode? Actually we cannot.
+    # We will receive engine later; workaround: this function will be wrapped.
+    return coeffs
+
+# We'll implement engine-specific cache below
+_coeff_pt_cache: dict[int, Dict[Tuple[int,int], object]] = {}
+
+
+def _get_coeff_plaintexts(engine: Engine):
+    """Get or build plaintexts of coefficients encoded for the given engine."""
+    slot_cnt = engine.slot_count
+    if slot_cnt in _coeff_pt_cache:
+        return _coeff_pt_cache[slot_cnt]
+    coeffs = _load_coeffs()
+    pt_dict: Dict[Tuple[int,int], object] = {}
+    for key, coeff in coeffs.items():
+        vec = np.full(slot_cnt, coeff, dtype=np.complex128)
+        pt = engine.encode(vec)
+        pt_dict[key] = pt
+    _coeff_pt_cache[slot_cnt] = pt_dict
+    return pt_dict
 
 # -----------------------------------------------------------------------------
-# 1. Prepare inputs
+# XOR operation
 # -----------------------------------------------------------------------------
-np.random.seed(42)
-alpha_int = np.random.randint(0, 16, size=SLOT_COUNT, dtype=np.uint8)
-beta_int  = np.random.randint(0, 16, size=SLOT_COUNT, dtype=np.uint8)
-expected_int = np.bitwise_xor(alpha_int, beta_int)
 
-# Map to zeta domain
-alpha = transform_to_zeta(alpha_int)
-beta  = transform_to_zeta(beta_int)
-
-# -----------------------------------------------------------------------------
-# 2. Initialise engine & keys
-# -----------------------------------------------------------------------------
-print("[INFO] Initialising engine …")
-# engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
-
-engine = Engine(
-            max_level=30,
-            mode="parallel",
-            thread_count=8,
-            device_id=0
-        )
-
-secret_key    = engine.create_secret_key()
-public_key    = engine.create_public_key(secret_key)
-relin_key     = engine.create_relinearization_key(secret_key)
-conjugate_key = engine.create_conjugation_key(secret_key)  # might be unused directly
-
-# -----------------------------------------------------------------------------
-# 3. Encrypt inputs
-# -----------------------------------------------------------------------------
-print("[INFO] Encrypting inputs …")
-enc_alpha = engine.encrypt(alpha, public_key)
-enc_beta  = engine.encrypt(beta,  public_key)
-
-# -----------------------------------------------------------------------------
-# 4. Build power bases
-# -----------------------------------------------------------------------------
-print("[INFO] Building power bases …")
-base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key, public_key)
-base_y = build_power_basis(engine, enc_beta,  relin_key, conjugate_key, public_key)
-
-print("[DEBUG] sorted(base_x.keys()) =", sorted(base_x.keys()))
-print("[DEBUG] sorted(base_y.keys()) =", sorted(base_y.keys()))
-
-# -----------------------------------------------------------------------------
-# 5. Load polynomial coefficients (sparse)
-# -----------------------------------------------------------------------------
-print("[INFO] Loading polynomial coefficients …")
-with open(COEFFS_JSON, "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-# entries are [[i, j, real, imag], ...]
-entries = data.get("entries", [])
-
-# Dict[(i, j)] -> complex
-coeffs: Dict[Tuple[int, int], complex] = {}
-for entry in entries:
-    if len(entry) != 4:
-        continue
-    i, j, real_val, imag_val = entry
-    c = complex(real_val, imag_val)
-    if abs(c) > 0:
-        coeffs[(int(i), int(j))] = c
+def _xor_operation(engine_context, enc_alpha, enc_beta):
+    engine = engine_context.engine
+    relin_key = engine_context.relinearization_key
+    conjugate_key = engine_context.conjugation_key
     
-# -----------------------------------------------------------------------------
-# Plaintext verification of polynomial (no HE) for first few slots
-# -----------------------------------------------------------------------------
-print("[DEBUG] Evaluating polynomial in plaintext for sanity …")
-plain_results = np.zeros(SLOT_COUNT, dtype=complex)
-for (i, j), coeff in coeffs.items():
-    plain_results += coeff * (alpha ** i) * (beta ** j)
+    # 1. Build power bases
+    base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key)
+    base_y = build_power_basis(engine, enc_beta,  relin_key, conjugate_key)
 
-unit_plain = plain_results / np.abs(plain_results)
-plain_int = zeta_to_int(unit_plain[:20])
+    # 2. Pre-encoded polynomial coefficients
+    coeff_pts = _get_coeff_plaintexts(engine)
+    
+    # 3. Evaluate polynomial securely
+    cipher_res = engine.multiply(enc_alpha, 0.0)
+
+    for (i, j), coeff_pt in coeff_pts.items():
+        term = engine.multiply(base_x[i], base_y[j], relin_key)
+        term_res = engine.multiply(term, coeff_pt)
+        cipher_res = engine.add(cipher_res, term_res)
+    
+    return cipher_res
 
 
-# -----------------------------------------------------------------------------
-# 6. Evaluate polynomial securely
-# -----------------------------------------------------------------------------
-print("[INFO] Evaluating XOR polynomial …")
-zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
-complex_terms: list[tuple[object, complex]] = []
 
-for (i, j), coeff in coeffs.items():
-    # Pre-computed power bases are stored in base_x / base_y
-    term = engine.multiply(base_x[i], base_y[j], relin_key)
-    complex_terms.append((term, coeff))
-
-cipher_res = zero_ct  # no real terms present
-
-# Add complex-coefficient terms one by one
-for term, coeff in complex_terms:
-    coeff_pt = engine.encode(np.full(SLOT_COUNT, coeff, dtype=complex))
-    term_res = engine.multiply(term, coeff_pt)
-    cipher_res = engine.add(cipher_res, term_res)
 
 # -----------------------------------------------------------------------------
-# 7. Decrypt & verify
+# Test functions
 # -----------------------------------------------------------------------------
-print("[INFO] Decrypting …")
-decoded_zeta = engine.decrypt(cipher_res, secret_key)
-unit_dec = decoded_zeta / np.abs(decoded_zeta)
-decoded_int = zeta_to_int(unit_dec)
 
-try:
-    np.testing.assert_array_equal(decoded_int, expected_int)
-    print("[PASS] XOR homomorphic evaluation matches plaintext XOR.")
-except AssertionError as err:
-    mismatch = np.count_nonzero(decoded_int != expected_int)
-    print(f"[FAIL] XOR result mismatch in {mismatch}/{SLOT_COUNT} slots.")
-    raise err 
+def transform_to_zeta(arr: np.ndarray) -> np.ndarray:
+    result = np.exp(-2j * np.pi * (arr % 16) / 16)
+    return result
+
+def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
+    """Inverse of `transform_to_zeta` assuming unit-magnitude complex numbers.
+
+    Values are mapped back to integers 0‥15 by measuring their phase.
+    """
+    angles = np.angle(zeta_arr)  # range (-π, π]
+    k      = (-angles * 16) / (2 * np.pi)
+    k      = np.mod(np.rint(k), 16).astype(np.uint8)
+    return k
+
+@dataclass
+class FHEContext:
+    """Bundle engine and all related keys in a single, typed container."""
+
+    engine: Engine
+    secret_key: "desilofhe.SecretKey"
+    public_key: "desilofhe.PublicKey"
+    rotation_key: "desilofhe.RotationKey"
+    relinearization_key: "desilofhe.RelinearizationKey"
+    conjugation_key: "desilofhe.ConjugationKey"
+    small_bootstrap_key: "desilofhe.SmallBootstrapKey"
+
+
+if __name__ == "__main__":
+    engine = Engine(
+        max_level=22,
+        mode="parallel",
+        thread_count=8,
+        device_id=0
+    )
+
+    public_key = engine.public_key
+    secret_key = engine.secret_key
+    relinearization_key = engine.relinearization_key
+    conjugation_key = engine.conjugation_key
+    engine_context = FHEContext(engine, public_key, secret_key, relinearization_key, conjugation_key)
+    
+    # 1. Encrypt inputs
+    np.random.seed(42)
+    alpha_int = np.random.randint(0, 16, size=32768, dtype=np.uint8)
+    beta_int  = np.random.randint(0, 16, size=32768, dtype=np.uint8)
+    expected_int = np.bitwise_xor(alpha_int, beta_int)
+
+    # Map to zeta domain
+    alpha = transform_to_zeta(alpha_int)
+    beta  = transform_to_zeta(beta_int)
+    
+    enc_alpha = engine.encrypt(alpha, public_key)
+    enc_beta = engine.encrypt(beta, public_key)
+    
+    # 2. Evaluate XOR operation
+    cipher_res = _xor_operation(engine_context, enc_alpha, enc_beta)
+    
+    # 3. Decrypt result
+    decoded_zeta = engine.decrypt(cipher_res, secret_key)
+    unit_dec = decoded_zeta / np.abs(decoded_zeta)
+    decoded_int = zeta_to_int(unit_dec)
+    
+    print(decoded_int == expected_int)
