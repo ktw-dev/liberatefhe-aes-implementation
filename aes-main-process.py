@@ -277,14 +277,21 @@ if __name__ == "__main__":
     enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
     enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
     
+    # DEBUG
     print(enc_zeta_hi_list)
     print(enc_zeta_lo_list)
     print(enc_key_hi_list)
     print(enc_key_lo_list)
     
+    # --- key HE-encryption stage ------------------------------------------------
     
+    # 1. 키 암호화
+    enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
+    enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
     
-    
+    # DEBUG
+    print(enc_key_hi_list)
+    print(enc_key_lo_list)
     
 
     # --- key Scheduling stage -------------------------------------------------
