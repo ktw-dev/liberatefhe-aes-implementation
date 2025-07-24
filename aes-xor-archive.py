@@ -13,38 +13,12 @@ import logging.handlers
 from collections import OrderedDict
 import warnings
 
-import time
 import math
+import time
 
 Scalar = Union[int, float, complex]
 
-def setup_logging():
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"xor_paper_opt_{timestamp}.log"
-    logger = logging.getLogger('xor')
-    logger.setLevel(logging.DEBUG)
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=10*1024*1024, backupCount=5
-    )
-    file_handler.setLevel(logging.WARNING)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    logger.info("Logging initialized. Log file: %s", log_file)
-    logger.info("=" * 80)
-    return log_file
 
-log_file_path = setup_logging()
-logger = logging.getLogger('xor')
 
 @dataclass
 class XORConfig:
@@ -62,29 +36,29 @@ class XORConfig:
 class XORPaperOptimized:
     def __init__(self, config: XORConfig):
         self.config = config
-        logger.info("Initializing XOR with desilofhe API optimizations")
+        
         self.engine = Engine(
             max_level=30,
             mode=config.mode,
             thread_count=config.thread_count,
             device_id=config.device_id if config.mode == "gpu" else 0
         )
-        logger.info("Creating FHE keys...")
+        
         start_time = time.time()
         self.secret_key = self.engine.create_secret_key()
         self.public_key = self.engine.create_public_key(self.secret_key)
         self.relin_key = self.engine.create_relinearization_key(self.secret_key)
         self.conj_key = self.engine.create_conjugation_key(self.secret_key)
-        # self.rotation_key = self.engine.create_rotation_key(self.secret_key)
-        # self.fixed_rotation_keys = {}
-        # rotation_deltas = [1, 2, 4, 8, 16]
-        # for delta in rotation_deltas:
-        #     if delta < self.engine.slot_count:
-        #         self.fixed_rotation_keys[delta] = self.engine.create_fixed_rotation_key(
-        #             self.secret_key, delta
-        #         )
-        key_gen_time = time.time() - start_time
-        logger.info(f"FHE key generation completed in {key_gen_time:.2f} seconds")
+        self.rotation_key = self.engine.create_rotation_key(self.secret_key)
+        self.fixed_rotation_keys = {}
+        rotation_deltas = [1, 2, 4, 8, 16]
+        for delta in rotation_deltas:
+            if delta < self.engine.slot_count:
+                self.fixed_rotation_keys[delta] = self.engine.create_fixed_rotation_key(
+                    self.secret_key, delta
+                )
+
+     
         self.scale = 2 ** config.precision_bits
         self.max_slots = self.engine.slot_count
         self.nibble_encoding = self._create_encoding(4)
@@ -94,12 +68,9 @@ class XORPaperOptimized:
         self._power_basis_cache = {}
         self._precompute_coefficients()
         self._load_noise_reduction_coeffs()
-        logger.info(f"XOR initialization complete. Slot count: {self.engine.slot_count}")
+     
     
-    def dbg_level(self, tag: str, ct: Any):
-        
-        if hasattr(ct, "level"):
-            logger.info(f"[DBG] {tag:<30}  remaining level = {ct.level}")
+
     def multiply_plain(self, ct: Any, val: Union[Scalar, np.ndarray, Any]) -> Any:
         
         if isinstance(val, (int, float)):
@@ -291,21 +262,19 @@ class XORPaperOptimized:
         return results
     
     def extract_nibbles(self, byte_enc: Any) -> Tuple[Any, Any]:
-        
-        logger.info("[Extract] Starting nibble extraction")
-        self.dbg_level("Input byte_enc", byte_enc)
+
         
         upper_coeffs = self._get_nibble_coeffs_optimized(is_upper=True)
         lower_coeffs = self._get_nibble_coeffs_optimized(is_upper=False)
 
         x_2 = self.engine.square(byte_enc, self.relin_key)
-        self.dbg_level("After x^2", x_2)
+
         
         x_4 = self.engine.square(x_2, self.relin_key)
-        self.dbg_level("After x^4", x_4)
+
         
         x_8 = self.engine.square(x_4, self.relin_key)
-        self.dbg_level("After x^8", x_8)
+
 
         poly_coeffs = np.zeros(8, dtype=np.complex128)
         for i in range(8):
@@ -314,17 +283,16 @@ class XORPaperOptimized:
                 poly_coeffs[i] = upper_coeffs[idx]
         
         poly_result = self.evaluate_polynomial(x_8, poly_coeffs)
-        self.dbg_level("After polynomial eval", poly_result)
+ 
         
         upper = self.engine.multiply(byte_enc, poly_result, self.relin_key)
-        self.dbg_level("Upper nibble", upper)
+
 
         lower = x_8
         if 8 < len(lower_coeffs) and abs(lower_coeffs[8] - 1.0) > 1e-14:
             lower = self.multiply_plain(lower, lower_coeffs[8])
-        self.dbg_level("Lower nibble", lower)
-        
-        logger.info("[Extract] Nibble extraction completed")
+    
+  
         return upper, lower
     
     def apply_nibble_xor(self, x_enc: Any, y_enc: Any) -> Any:
@@ -333,7 +301,8 @@ class XORPaperOptimized:
         return self._evaluate_bivariate_poly(x_enc, y_enc, coeffs_2d)
     
     def apply_nibble_xor_fast(self, x_enc, y_enc):
-        logger.info("[XOR] Fast Walsh (8-term, fixed)")
+       
+        raise NotImplementedError("Fast Walsh XOR is not implemented in this version.")
 
         # ζ := e^{2πi/16}
         zeta4  = 1j          # ζ⁴ = i
@@ -373,9 +342,8 @@ class XORPaperOptimized:
 
         
     def _evaluate_bivariate_poly(self, x_enc: Any, y_enc: Any, coeffs_2d: np.ndarray) -> Any:
-        logger.info("[Poly] Starting bivariate polynomial evaluation")
-        self.dbg_level("Input x_enc", x_enc)
-        self.dbg_level("Input y_enc", y_enc)
+   
+
         non_zero_mask = np.abs(coeffs_2d) > 1e-14
         non_zero_indices = np.argwhere(non_zero_mask)
         if len(non_zero_indices) == 0:
@@ -406,13 +374,13 @@ class XORPaperOptimized:
                 
                 complex_terms.append((x_powers[0], coeff))
                 continue
-            # elif idx_i == 0:
-            #     term = y_powers[idx_j]
-            # elif idx_j == 0:
-            #     term = x_powers[idx_i] # 두 변수 중 하나의 지수가 0인 경우는 없음. 해당 케이스는 없음.
+            elif idx_i == 0:
+                term = y_powers[idx_j]
+            elif idx_j == 0:
+                term = x_powers[idx_i]
             else:
                 term = self.engine.multiply(x_powers[idx_i], y_powers[idx_j], self.relin_key)
-                self.dbg_level(f"x^{idx_i} * y^{idx_j}", term)
+            
 
             if abs(coeff.imag) < 1e-10:
                 real_terms.append(term)
@@ -443,8 +411,7 @@ class XORPaperOptimized:
             zero_pt = self.engine.encode(np.zeros(self.max_slots, dtype=np.complex128))
             result = self.engine.multiply(x_enc, zero_pt)
         
-        self.dbg_level("Bivariate poly result", result)
-        logger.info("[Poly] Bivariate polynomial evaluation completed")
+
         return result
     
     def encrypt_nibbles(self, byte_array: np.ndarray, level: int = 20) -> Tuple[Any, Any]:
@@ -457,8 +424,7 @@ class XORPaperOptimized:
     
     def apply_nibble_xor_direct(self, x_hi: Any, x_lo: Any, y_hi: Any, y_lo: Any, use_fast: bool = False) -> Tuple[Any, Any]:
         
-        logger.info("[XOR] Starting nibble XOR operation")
-        logger.info(f"[XOR] Method: {'Fast Walsh' if use_fast else 'Polynomial'}")
+ 
         
         if use_fast:
             hi_xor = self.apply_nibble_xor_fast(x_hi, y_hi)
@@ -467,7 +433,7 @@ class XORPaperOptimized:
             hi_xor = self.apply_nibble_xor(x_hi, y_hi)
             lo_xor = self.apply_nibble_xor(x_lo, y_lo)
         
-        logger.info("[XOR] Nibble XOR completed")
+
         return hi_xor, lo_xor
     
     def apply_byte_xor_via_nibbles(self, x_enc: Any, y_enc: Any) -> Tuple[Any, Any]:
@@ -540,12 +506,11 @@ class XORPaperOptimized:
         self._coeff_cache[key] = value
     
     def _precompute_coefficients(self):
-        logger.info("Pre-computing XOR coefficients...")
+    
         self._get_nibble_coeffs_optimized(is_upper=True)
         self._get_nibble_coeffs_optimized(is_upper=False)
         self._get_xor_coeffs_2d(4)
-        self.save_cached_coefficients()
-        logger.info("Coefficient pre-computation complete")
+ 
     
     def _load_cached_coefficients(self):
         cache_dir = Path("xor_cache")
@@ -554,12 +519,11 @@ class XORPaperOptimized:
         for prefix in ["upper", "lower"]:
             file = cache_dir / f"{prefix}_nibble_optimized.npy"
             if file.exists():
-                try:
+                
                     coeffs = np.load(file)
                     self._coeff_cache[f"{prefix}_nibble_optimized"] = coeffs
-                    logger.info(f"Loaded cached {prefix} nibble coefficients")
-                except Exception as e:
-                    logger.warning(f"Failed to load {prefix} nibble cache: {e}")
+                 
+              
     
     def save_cached_coefficients(self):
         if not self.config.cache_coefficients:
@@ -569,19 +533,19 @@ class XORPaperOptimized:
         for key, coeffs in self._coeff_cache.items():
             file = cache_dir / f"{key}.npy"
             np.save(file, coeffs)
-            logger.info(f"Saved coefficients to {file}")
+      
 
     def _load_noise_reduction_coeffs(self):
 
         noise_coeff_file = Path("xor_cache") / "noise_reduction_coeffs.csv"
         if noise_coeff_file.exists():
-            try:
+           
                 coeffs = np.loadtxt(noise_coeff_file, dtype=np.complex128, delimiter=',')
                 self._coeff_cache['noise_reduction_f'] = coeffs
-                logger.info(f"Loaded noise reduction coefficients from {noise_coeff_file}")
+                
                 return
-            except Exception as e:
-                logger.warning(f"Failed to load noise coefficients: {e}")
+        
+           
 
         degree = 32
         coeffs = np.zeros(degree + 1, dtype=np.complex128)
@@ -731,7 +695,6 @@ class SimdXorWrapper:
         lo = self.core.decode_array(lo_dec, 4)
         return (hi << 4) | lo
     
-start_time = time.time()
 cfg = XORConfig(thread_count=16, precision_bits=40)
 xor_core = XORPaperOptimized(cfg)
 
@@ -745,6 +708,7 @@ b_plain  = np.random.randint(0, 16, size=16*2048, dtype=np.uint8)
 a_pack = simdxor.pack(a_plain, level=22)
 b_pack = simdxor.pack(b_plain, level=22)
 
+start_time = time.time()
 # ── ② SIMD XOR  (Ciphertext 유지) ───────────────────────
 c_pack = simdxor.xor(a_pack, b_pack)  
 
