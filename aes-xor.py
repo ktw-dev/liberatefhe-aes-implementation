@@ -153,10 +153,8 @@ class FHEContext:
     engine: Engine
     secret_key: "desilofhe.SecretKey"
     public_key: "desilofhe.PublicKey"
-    rotation_key: "desilofhe.RotationKey"
     relinearization_key: "desilofhe.RelinearizationKey"
     conjugation_key: "desilofhe.ConjugationKey"
-    small_bootstrap_key: "desilofhe.SmallBootstrapKey"
 
 
 if __name__ == "__main__":
@@ -170,7 +168,7 @@ if __name__ == "__main__":
     secret_key    = engine.create_secret_key()
     public_key    = engine.create_public_key(secret_key)
     relinearization_key     = engine.create_relinearization_key(secret_key)
-    conjugation_key = engine.create_conjugation_key(secret_key)  # might be unused directly   
+    conjugation_key = engine.create_conjugation_key(secret_key)  
     engine_context = FHEContext(engine, public_key, secret_key, relinearization_key, conjugation_key)
     
     # 1. Encrypt inputs
@@ -194,4 +192,4 @@ if __name__ == "__main__":
     unit_dec = decoded_zeta / np.abs(decoded_zeta)
     decoded_int = zeta_to_int(unit_dec)
     
-    print(decoded_int == expected_int)
+    print(np.all(decoded_int == expected_int))
