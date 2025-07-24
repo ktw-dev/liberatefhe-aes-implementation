@@ -266,6 +266,26 @@ if __name__ == "__main__":
     print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo_list[0][:4]])
 
     wait_next_stage("Key initiation", "key Scheduling")
+    
+    # --- data HE-encryption stage ------------------------------------------------
+    
+    # 1. 데이터 암호화
+    enc_zeta_hi_list = [engine_context.engine.encrypt(zeta_hi, engine_context.public_key) for zeta_hi in zeta_hi_list]
+    enc_zeta_lo_list = [engine_context.engine.encrypt(zeta_lo, engine_context.public_key) for zeta_lo in zeta_lo_list]
+
+    # 2. 키 암호화
+    enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
+    enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
+    
+    print(enc_zeta_hi_list[0][:4])
+    print(enc_zeta_lo_list[0][:4])
+    print(enc_key_hi_list[0][:4])
+    print(enc_key_lo_list[0][:4])
+    
+    
+    
+    
+    
 
     # --- key Scheduling stage -------------------------------------------------
 
