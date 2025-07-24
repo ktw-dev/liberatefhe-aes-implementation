@@ -168,30 +168,14 @@ plain_int = zeta_to_int(unit_plain[:20])
 # -----------------------------------------------------------------------------
 print("[INFO] Evaluating XOR polynomial …")
 zero_ct = engine.encrypt(np.zeros(SLOT_COUNT), public_key)
-
-# ── New evaluation using weighted_sum (real coefficients) ───────────────
-real_terms: list[object] = []
-real_weights: list[float] = []  # index 1..N  (index 0 = const 0.0 added later)
 complex_terms: list[tuple[object, complex]] = []
 
 for (i, j), coeff in coeffs.items():
     # Pre-computed power bases are stored in base_x / base_y
     term = engine.multiply(base_x[i], base_y[j], relin_key)
+    complex_terms.append((term, coeff))
 
-    if abs(coeff.imag) < 1e-14:
-        # Real coefficient → accumulate for weighted_sum
-        real_terms.append(term)
-        real_weights.append(float(coeff.real))
-    else:
-        # Complex coefficient → accumulate for separate processing
-        complex_terms.append((term, coeff))
-
-# Perform weighted_sum for real-coefficient terms
-if real_terms:
-    # weighted_sum expects weights[0] to be the constant term (here 0.0)
-    cipher_res = engine.weighted_sum(real_terms, [0.0] + real_weights)
-else:
-    cipher_res = zero_ct  # no real terms present
+cipher_res = zero_ct  # no real terms present
 
 # Add complex-coefficient terms one by one
 for term, coeff in complex_terms:
