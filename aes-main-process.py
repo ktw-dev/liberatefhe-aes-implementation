@@ -23,26 +23,7 @@ import importlib.util
 import numpy as np
 import time
 from typing import Tuple
-from desilofhe import Engine
-from dataclasses import dataclass
-
-
-# -----------------------------------------------------------------------------
-# Context dataclass -----------------------------------------------------------
-# -----------------------------------------------------------------------------
-
-@dataclass
-class FHEContext:
-    """Bundle engine and all related keys in a single, typed container."""
-
-    engine: Engine
-    secret_key: "desilofhe.SecretKey"
-    public_key: "desilofhe.PublicKey"
-    rotation_key: "desilofhe.RotationKey"
-    relinearization_key: "desilofhe.RelinearizationKey"
-    conjugation_key: "desilofhe.ConjugationKey"
-    small_bootstrap_key: "desilofhe.SmallBootstrapKey"
-
+from engine_context import CKKS_EngineContext
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers -------------------------------------------------------
@@ -75,49 +56,14 @@ aes_transform_zeta = _load_module("aes-transform-zeta.py", "aes_transform_zeta")
 # Engine Initiation --------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-def engine_initiation() -> FHEContext:
+def engine_initiation() -> CKKS_EngineContext:
     """Create engine and all keys, returning a bundled FHEContext."""
     
-    print("create engine with cpu mode, log_coeff_count=16, special_prime_count=1\n")
-    # engine = Engine(log_coeff_count=16, special_prime_count=1, mode="cpu")
-    engine = Engine(
-            # max_level=30, # 이 값은 조절해도 되는지 따로 확인할 것. [tag: check]
-            mode="parallel",
-            thread_count=8,
-            device_id=0
-        ) # 훨씬 빠름
+    print("create engine\n")
     
-    print("create secret key\n")
-    secret_key = engine.create_secret_key()
+    engine_context = CKKS_EngineContext(max_level=22, mode="parallel", thread_count=8, device_id=0)
     
-    print("create public key\n")
-    public_key = engine.create_public_key(secret_key)
-    
-    print("create rotation key. This will take 30s over\n")
-    rotation_key = engine.create_rotation_key(secret_key)
-    
-    print("create relinearization key\n")
-    relinearization_key = engine.create_relinearization_key(secret_key)
-    
-    print("create conjugation key\n")
-    conjugation_key = engine.create_conjugation_key(secret_key)
-    
-    print("create small bootstrap key\n")
-    small_bootstrap_key = engine.create_small_bootstrap_key(secret_key)
-    
-    
-    print("engine initiation complete!!!\n")
-
-    return FHEContext(
-        engine=engine,
-        secret_key=secret_key,
-        public_key=public_key,
-        rotation_key=rotation_key,
-        relinearization_key=relinearization_key,
-        conjugation_key=conjugation_key,
-        small_bootstrap_key=small_bootstrap_key,
-    )
-
+    return engine_context
 
 # -----------------------------------------------------------------------------
 # Data initiation --------------------------------------------------------------

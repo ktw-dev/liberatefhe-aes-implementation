@@ -30,7 +30,32 @@ XOR operation - Step by Step:
 
 import numpy as np
 from typing import Tuple
-import desilofhe
+import importlib.util
+import pathlib
+from engine_context import CKKS_EngineContext
+
+# -----------------------------------------------------------------------------
+# Dynamic import helpers (copied from aes-main-process) ------------------------
+# -----------------------------------------------------------------------------
+
+_THIS_DIR = pathlib.Path(__file__).resolve().parent
+
+
+def _load_module(fname: str, alias: str):
+    """Load a Python file in the current directory as a module with *alias*."""
+    path = _THIS_DIR / fname
+    spec = importlib.util.spec_from_file_location(alias, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {fname}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    return module
+
+# Dynamically load `aes-xor.py` as module alias `aes_xor`
+_aes_xor_mod = _load_module("aes-xor.py", "aes_xor")
+_xor_operation = _aes_xor_mod._xor_operation
+
+
 
 
 # Round constants for AES key expansion (Rcon)
@@ -87,3 +112,14 @@ def rot_word(engine_context, enc_key_hi_list, enc_key_lo_list):
     
     return enc_key_hi_list_concatenated, enc_key_lo_list_concatenated
 
+def sub_word(engine_context, enc_key_hi_list, enc_key_lo_list):
+    pass
+
+def rcon_xor(engine_context, enc_key_hi_list, enc_key_lo_list):
+    pass
+
+def xor(engine_context, enc_key_hi_list, enc_key_lo_list):
+    pass
+
+def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
+    pass

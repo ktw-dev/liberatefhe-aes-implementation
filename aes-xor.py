@@ -7,6 +7,7 @@ from functools import lru_cache
 from dataclasses import dataclass
 import numpy as np
 import desilofhe
+from engine_context import CKKS_EngineContext
 
 # -----------------------------------------------------------------------------
 # Import helper from project root
@@ -146,30 +147,11 @@ def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
     k      = np.mod(np.rint(k), 16).astype(np.uint8)
     return k
 
-@dataclass
-class FHEContext:
-    """Bundle engine and all related keys in a single, typed container."""
-
-    engine: Engine
-    secret_key: "desilofhe.SecretKey"
-    public_key: "desilofhe.PublicKey"
-    relinearization_key: "desilofhe.RelinearizationKey"
-    conjugation_key: "desilofhe.ConjugationKey"
-
-
 if __name__ == "__main__":
-    engine = Engine(
-        max_level=22,
-        mode="parallel",
-        thread_count=8,
-        device_id=0
-    )
-
-    secret_key    = engine.create_secret_key()
-    public_key    = engine.create_public_key(secret_key)
-    relinearization_key     = engine.create_relinearization_key(secret_key)
-    conjugation_key = engine.create_conjugation_key(secret_key)  
-    engine_context = FHEContext(engine, public_key, secret_key, relinearization_key, conjugation_key)
+    engine_context = CKKS_EngineContext(max_level=22, mode="parallel", thread_count=8, device_id=0)
+    engine = engine_context.engine
+    public_key = engine_context.public_key
+    secret_key = engine_context.secret_key
     
     # 1. Encrypt inputs
     np.random.seed(42)
