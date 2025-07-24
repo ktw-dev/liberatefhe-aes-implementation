@@ -277,10 +277,10 @@ if __name__ == "__main__":
     enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
     enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
     
-    print(enc_zeta_hi_list[0][:4])
-    print(enc_zeta_lo_list[0][:4])
-    print(enc_key_hi_list[0][:4])
-    print(enc_key_lo_list[0][:4])
+    print(enc_zeta_hi_list)
+    print(enc_zeta_lo_list)
+    print(enc_key_hi_list)
+    print(enc_key_lo_list)
     
     
     
