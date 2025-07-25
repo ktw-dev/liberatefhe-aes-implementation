@@ -53,7 +53,7 @@ aes_key_array = _load_module("aes-key-array.py", "aes_key_array")
 aes_transform_zeta = _load_module("aes-transform-zeta.py", "aes_transform_zeta")
 
 # -----------------------------------------------------------------------------
-# Engine Initiation --------------------------------------------------------
+# Engine Initiation ------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 def engine_initiation() -> CKKS_EngineContext:
@@ -63,6 +63,7 @@ def engine_initiation() -> CKKS_EngineContext:
     
     engine_context = CKKS_EngineContext(max_level=22, mode="parallel", thread_count=8, device_id=0)
     
+    print("engine created\n")
     return engine_context
 
 # -----------------------------------------------------------------------------
