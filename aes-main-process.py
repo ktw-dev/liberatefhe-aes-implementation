@@ -255,7 +255,7 @@ if __name__ == "__main__":
     
     # 1. 데이터 암호화
     enc_zeta_hi = engine.encrypt(zeta_hi, public_key)
-    enc_zeta_lo = engine.encrypt(zeta_lo, public_key
+    enc_zeta_lo = engine.encrypt(zeta_lo, public_key)
     
     # DEBUG
     print(enc_zeta_hi)
