@@ -56,12 +56,24 @@ aes_transform_zeta = _load_module("aes-transform-zeta.py", "aes_transform_zeta")
 # Engine Initiation ------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-def engine_initiation() -> CKKS_EngineContext:
+def engine_initiation(
+                signature: int, 
+                *,
+                max_level: int = 30, 
+                mode: str = 'cpu', 
+                use_bootstrap: bool = False, 
+                use_multiparty: bool = False, 
+                thread_count: int = 0, 
+                device_id: int = 0, 
+                fixed_rotation: bool = False, 
+                delta_list: list[int] = None, 
+                log_coeff_count: int = 0, 
+                special_prime_count: int = 0) -> CKKS_EngineContext:
     """Create engine and all keys, returning a bundled FHEContext."""
     
     print("create engine\n")
     
-    engine_context = CKKS_EngineContext(max_level=22, mode="parallel", thread_count=8, device_id=0)
+    engine_context = CKKS_EngineContext(signature, max_level=max_level, mode=mode, use_bootstrap=use_bootstrap, use_multiparty=use_multiparty, thread_count=thread_count, device_id=device_id, fixed_rotation=fixed_rotation, delta_list=delta_list, log_coeff_count=log_coeff_count, special_prime_count=special_prime_count)
     
     print("engine created\n")
     return engine_context
@@ -114,11 +126,11 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
     zeta_upper = aes_transform_zeta.transform_to_zeta(upper)
     zeta_lower = aes_transform_zeta.transform_to_zeta(lower)
     
-    # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
-    zeta_upper_list = [zeta_upper[i:i+2048] for i in range(0, len(zeta_upper), 2048)]
-    zeta_lower_list = [zeta_lower[i:i+2048] for i in range(0, len(zeta_lower), 2048)]
+    # # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
+    # zeta_upper_list = [zeta_upper[i:i+2048] for i in range(0, len(zeta_upper), 2048)]
+    # zeta_lower_list = [zeta_lower[i:i+2048] for i in range(0, len(zeta_lower), 2048)]
 
-    return blocks, flat, upper, lower, zeta_upper_list, zeta_lower_list
+    return blocks, flat, upper, lower, zeta_upper, zeta_lower
 
 # -----------------------------------------------------------------------------
 # Key initiation --------------------------------------------------------------
@@ -147,11 +159,11 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
     key_zeta_upper = aes_transform_zeta.transform_to_zeta(key_upper)
     key_zeta_lower = aes_transform_zeta.transform_to_zeta(key_lower)
     
-    # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
-    key_zeta_upper_list = [key_zeta_upper[i:i+2048] for i in range(0, len(key_zeta_upper), 2048)]
-    key_zeta_lower_list = [key_zeta_lower[i:i+2048] for i in range(0, len(key_zeta_lower), 2048)]
+    # # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
+    # key_zeta_upper_list = [key_zeta_upper[i:i+2048] for i in range(0, len(key_zeta_upper), 2048)]
+    # key_zeta_lower_list = [key_zeta_lower[i:i+2048] for i in range(0, len(key_zeta_lower), 2048)]
 
-    return key, key_flat, key_upper, key_lower, key_zeta_upper_list, key_zeta_lower_list
+    return key, key_flat, key_upper, key_lower, key_zeta_upper, key_zeta_lower
 
 # -----------------------------------------------------------------------------
 # Key Scheduling --------------------------------------------------------------
@@ -202,42 +214,52 @@ if __name__ == "__main__":
         raise SystemExit("❌  Block count must be between 1 and 2048 inclusive.")
     
     # --- Engine initiation stage -----------------------------------------------
-    engine_context = engine_initiation()
+    engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, use_multiparty = False, thread_count = 16, device_id = 0)
+    
+    engine = engine_context.get_engine()
+    public_key = engine_context.get_public_key()
+    secret_key = engine_context.get_secret_key()
+    relinearization_key = engine_context.get_relinearization_key()
+    conjugation_key = engine_context.get_conjugation_key()
+    rotation_key = engine_context.get_rotation_key()
+    small_bootstrap_key = engine_context.get_small_bootstrap_key()
+    bootstrap_key = engine_context.get_bootstrap_key()
+    
 
     wait_next_stage("Engine Initiation", "Data initiation")
     
     # --- Data initiation stage ------------------------------------------------
-    blocks, flat, _, _, zeta_hi_list, zeta_lo_list = data_initiation(n_blocks)
+    blocks, flat, _, _, zeta_hi, zeta_lo = data_initiation(n_blocks)
 
     # DEBUG
     print("Generated", len(blocks), "block(s)")
     print("First block bytes (hex):", [f"{b:02X}" for b in blocks[0]] if blocks.size else [])
     print("Flat array sample (0-15):", [f"{b:02X}" for b in flat[:16]])
-    print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in zeta_hi_list[0][:4]])
-    print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in zeta_lo_list[0][:4]])
+    print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in zeta_hi[:4]])
+    print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in zeta_lo[:4]])
 
     wait_next_stage("Data initiation", "key initiation")
 
     # --- Key initiation stage -------------------------------------------------
-    key_bytes, key_flat, _, _, key_zeta_hi_list, key_zeta_lo_list = key_initiation()
+    key_bytes, key_flat, _, _, key_zeta_hi, key_zeta_lo = key_initiation()
 
     # DEBUG
     print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
 
-    print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi_list[0][:4]])
-    print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo_list[0][:4]])
+    print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
+    print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
 
     wait_next_stage("Key initiation", "data/key HE-encryption")
     
     # --- data HE-encryption stage ------------------------------------------------
     
     # 1. 데이터 암호화
-    enc_zeta_hi_list = [engine_context.engine.encrypt(zeta_hi, engine_context.public_key) for zeta_hi in zeta_hi_list]
-    enc_zeta_lo_list = [engine_context.engine.encrypt(zeta_lo, engine_context.public_key) for zeta_lo in zeta_lo_list]
+    enc_zeta_hi_list = 
+    enc_zeta_lo_list = 
 
     # 2. 키 암호화
-    enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
-    enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
+    enc_key_hi_list =
+    enc_key_lo_list = 
     
     # # DEBUG
     # print(enc_zeta_hi_list)

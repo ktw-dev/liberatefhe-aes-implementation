@@ -29,27 +29,55 @@ class CKKS_EngineContext:
     # ---------------------------------------------------------------------
     # Construction helpers
     # ---------------------------------------------------------------------
-    def __init__(self, *, max_level: int = 30, mode: str = "parallel", thread_count: int = 8, device_id: int = 0) -> None:
+    def __init__(self,  
+             signature: int, 
+             *,
+             max_level: int = 30, 
+             mode: str = 'cpu', 
+             use_bootstrap: bool = False, 
+             use_multiparty: bool = False, 
+             thread_count: int = 0, 
+             device_id: int = 0, 
+             fixed_rotation: bool = False, 
+             delta_list: list[int] = None, 
+             log_coeff_count: int = 0, 
+             special_prime_count: int = 0) -> None:
         """Create an Engine and generate all default keys.
         
-        Parameters
-        ----------
-        max_level : int, optional
-            Max multiplicative depth. 30 suffices for typical AES circuits.
-        mode : {"cpu", "parallel", "gpu"}, optional
-            Execution backend. "parallel" uses multi-threaded CPU.
-        thread_count : int, optional
-            Worker threads for CPU/gpu kernels and FFTs.
-        device_id : int, optional
-            GPU device index when *mode* == "gpu".
+        지원되는 생성자 시그니처
+        1. Engine(mode:str='cpu', use_bootstrap:bool=False, use_multiparty: bool = False, thread_count: int = 0, device_id: int = 0)
+        2. Engine(max_level: int, mode: str = ‘cpu’, *, use_multiparty: bool = False, thread_count: int = 0, device_id: int = 0)
+        3. Engine(log_coeff_count: int, special_prime_count: int, mode: str = ‘cpu’, *, use_multiparty: bool = False, thread_count: int = 0, device_id: int = 0)
         """
-        self.engine = Engine(
-            max_level=max_level,
-            mode=mode,
-            thread_count=thread_count,
-            device_id=device_id if mode == "gpu" else 0,
-        )
+        if signature == 1:
+            self.engine = Engine(
+                mode=mode,
+                use_bootstrap=use_bootstrap,
+                use_multiparty=use_multiparty,
+                thread_count=thread_count,
+                device_id=device_id
+            )
+        elif signature == 2:
+            self.engine = Engine(
+                max_level=max_level,
+                mode=mode,
+                use_multiparty=use_multiparty,
+                thread_count=thread_count,
+                device_id=device_id
+            )
+        elif signature == 3:
+            self.engine = Engine(
+                log_coeff_count=log_coeff_count,
+                special_prime_count=special_prime_count,
+                mode=mode,
+                use_multiparty=use_multiparty,
+                thread_count=thread_count,
+                device_id=device_id
+            )
+        else:
+            raise ValueError(f"Unsupported signature: {signature}")
 
+        self.fixed_rotation_key_list = []
         # ---- Key generation ------------------------------------------------
         self.secret_key = self.engine.create_secret_key()
         self.public_key = self.engine.create_public_key(self.secret_key)
@@ -57,8 +85,13 @@ class CKKS_EngineContext:
         self.conjugation_key = self.engine.create_conjugation_key(self.secret_key)
         self.rotation_key = self.engine.create_rotation_key(self.secret_key)
 
+        if fixed_rotation and delta_list is not None:
+            for delta in delta_list:
+                self.fixed_rotation_key_list.append(self.engine.create_fixed_rotation_key(self.secret_key, delta))
+
         # Some applications may not need small bootstrap; keep optional
         self.small_bootstrap_key = self.engine.create_small_bootstrap_key(self.secret_key)
+        self.bootstrap_key = self.engine.create_bootstrap_key(self.secret_key)
 
     # ---------------------------------------------------------------------
     # Representation helpers
@@ -98,6 +131,9 @@ class CKKS_EngineContext:
     
     def get_small_bootstrap_key(self) -> "desilofhe.SmallBootstrapKey":
         return self.small_bootstrap_key
+    
+    def get_bootstrap_key(self) -> "desilofhe.BootstrapKey":
+        return self.bootstrap_key
     
     def get_engine(self):
         return self.engine
