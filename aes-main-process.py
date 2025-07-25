@@ -254,28 +254,24 @@ if __name__ == "__main__":
     # --- data HE-encryption stage ------------------------------------------------
     
     # 1. 데이터 암호화
-    enc_zeta_hi_list = 
-    enc_zeta_lo_list = 
-
-    # 2. 키 암호화
-    enc_key_hi_list =
-    enc_key_lo_list = 
+    enc_zeta_hi = engine.encrypt(zeta_hi, public_key)
+    enc_zeta_lo = engine.encrypt(zeta_lo, public_key
     
-    # # DEBUG
-    # print(enc_zeta_hi_list)
-    # print(enc_zeta_lo_list)
-    # print(enc_key_hi_list)
-    # print(enc_key_lo_list)
+    # DEBUG
+    print(enc_zeta_hi)
+    print(enc_zeta_lo)
+    print(enc_key_hi)
+    print(enc_key_lo)
     
     # --- key HE-encryption stage ------------------------------------------------
     
     # 1. 키 암호화
-    enc_key_hi_list = [engine_context.engine.encrypt(key_hi, engine_context.public_key) for key_hi in key_zeta_hi_list]
-    enc_key_lo_list = [engine_context.engine.encrypt(key_lo, engine_context.public_key) for key_lo in key_zeta_lo_list]
+    enc_key_hi = engine.encrypt(key_zeta_hi, public_key)
+    enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
     
-    # # DEBUG
-    # print(enc_key_hi_list)
-    # print(enc_key_lo_list)
+    # DEBUG
+    print(enc_key_hi)
+    print(enc_key_lo)
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
