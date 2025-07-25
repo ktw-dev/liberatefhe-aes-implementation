@@ -229,14 +229,14 @@ if __name__ == "__main__":
     wait_next_stage("Engine Initiation", "Data initiation")
     
     # --- Data initiation stage ------------------------------------------------
-    blocks, flat, _, _, zeta_hi, zeta_lo = data_initiation(n_blocks)
+    blocks, flat, _, _, data_zeta_hi, data_zeta_lo = data_initiation(n_blocks)
 
     # DEBUG
-    print("Generated", len(blocks), "block(s)")
-    print("First block bytes (hex):", [f"{b:02X}" for b in blocks[0]] if blocks.size else [])
-    print("Flat array sample (0-15):", [f"{b:02X}" for b in flat[:16]])
-    print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in zeta_hi[:4]])
-    print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in zeta_lo[:4]])
+    # print("Generated", len(blocks), "block(s)")
+    # print("First block bytes (hex):", [f"{b:02X}" for b in blocks[0]] if blocks.size else [])
+    # print("Flat array sample (0-15):", [f"{b:02X}" for b in flat[:16]])
+    # print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in data_zeta_hi[:4]])
+    # print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in data_zeta_lo[:4]])
 
     wait_next_stage("Data initiation", "key initiation")
 
@@ -244,24 +244,23 @@ if __name__ == "__main__":
     key_bytes, key_flat, _, _, key_zeta_hi, key_zeta_lo = key_initiation()
 
     # DEBUG
-    print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
+    # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
 
-    print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
-    print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
+    # print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
+    # print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
 
     wait_next_stage("Key initiation", "data/key HE-encryption")
     
     # --- data HE-encryption stage ------------------------------------------------
     
     # 1. 데이터 암호화
-    enc_zeta_hi = engine.encrypt(zeta_hi, public_key)
-    enc_zeta_lo = engine.encrypt(zeta_lo, public_key)
+    enc_data_hi = engine.encrypt(data_zeta_hi, public_key)
+    enc_data_lo = engine.encrypt(data_zeta_lo, public_key)
     
     # DEBUG
-    print(enc_zeta_hi)
-    print(enc_zeta_lo)
-    print(enc_key_hi)
-    print(enc_key_lo)
+    # print(enc_data_hi)
+    # print(enc_data_lo)
+
     
     # --- key HE-encryption stage ------------------------------------------------
     
@@ -270,8 +269,8 @@ if __name__ == "__main__":
     enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
     
     # DEBUG
-    print(enc_key_hi)
-    print(enc_key_lo)
+    # print(enc_key_hi)
+    # print(enc_key_lo)
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
