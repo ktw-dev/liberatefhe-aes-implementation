@@ -56,8 +56,6 @@ _aes_xor_mod = _load_module("aes-xor.py", "aes_xor")
 _xor_operation = _aes_xor_mod._xor_operation
 
 
-
-
 # Round constants for AES key expansion (Rcon)
 AES_RCON = np.array([
     0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
@@ -119,7 +117,7 @@ def rcon_xor(engine_context, enc_key_hi_list, enc_key_lo_list):
     pass
 
 def xor(engine_context, enc_key_hi_list, enc_key_lo_list):
-    pass
+    return _xor_operation(engine_context, enc_key_hi_list, enc_key_lo_list)
 
 def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     pass
