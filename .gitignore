@@ -20,7 +20,6 @@ node_modules/
 *.njsproj
 *.sln
 *.sw?
-.taskmaster
 .vscode
 
 # OS specific
