@@ -74,6 +74,7 @@ def _load_coeffs(path=COEFFS_JSON):
             for i, j, r, im in data["entries"] if r or im}
 
 @lru_cache(maxsize=1)
+
 def _coeff_plaintexts(slot_count: int):
     """Return dict[(i,j)] -> plaintext (encoded complex coeff) for given slot count."""
     coeffs = _load_coeffs()
