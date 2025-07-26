@@ -74,7 +74,6 @@ def _load_coeffs(path=COEFFS_JSON):
             for i, j, r, im in data["entries"] if r or im}
 
 @lru_cache(maxsize=1)
-
 def _coeff_plaintexts(slot_count: int):
     """Return dict[(i,j)] -> plaintext (encoded complex coeff) for given slot count."""
     coeffs = _load_coeffs()
@@ -132,6 +131,8 @@ def _xor_operation(engine_context, enc_alpha, enc_beta):
 # -----------------------------------------------------------------------------
 # Test functions
 # -----------------------------------------------------------------------------
+import time
+import math
 
 def transform_to_zeta(arr: np.ndarray) -> np.ndarray:
     result = np.exp(-2j * np.pi * (arr % 16) / 16)
@@ -148,10 +149,13 @@ def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
     return k
 
 if __name__ == "__main__":
-    engine_context = CKKS_EngineContext(max_level=22, mode="parallel", thread_count=8, device_id=0)
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
     engine = engine_context.engine
     public_key = engine_context.public_key
     secret_key = engine_context.secret_key
+    relinearization_key = engine_context.relinearization_key
+    conjugation_key = engine_context.conjugation_key
+    bootstrap_key = engine_context.bootstrap_key
     
     # 1. Encrypt inputs
     np.random.seed(42)
@@ -163,12 +167,18 @@ if __name__ == "__main__":
     alpha = transform_to_zeta(alpha_int)
     beta  = transform_to_zeta(beta_int)
     
-    enc_alpha = engine.encrypt(alpha, public_key)
-    enc_beta = engine.encrypt(beta, public_key)
+    enc_alpha = engine.encrypt(alpha, public_key, level=5)
+    enc_beta = engine.encrypt(beta, public_key, level=5)
     
     # 2. Evaluate XOR operation
+    start_time = time.time()
     cipher_res = _xor_operation(engine_context, enc_alpha, enc_beta)
     
+    bootstrap_ct = engine.bootstrap(cipher_res, relinearization_key, conjugation_key, bootstrap_key)
+    end_time = time.time()
+    print(f"XOR time taken: {end_time - start_time} seconds")
+
+    start_time = time.time()
     # 3. Decrypt result
     decoded_zeta = engine.decrypt(cipher_res, secret_key)
     unit_dec = decoded_zeta / np.abs(decoded_zeta)
