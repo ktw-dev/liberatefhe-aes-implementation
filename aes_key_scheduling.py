@@ -33,6 +33,7 @@ from typing import Tuple
 import importlib.util
 import pathlib
 from engine_context import CKKS_EngineContext
+from aes_SubBytes import sub_bytes
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers (copied from aes-main-process) ------------------------
@@ -141,14 +142,16 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     return rotated_hi_bytes, rotated_lo_bytes
 
 
-def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi_list, enc_key_lo_list):
+def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+    nibble_pack = sub_bytes(engine_context, enc_key_hi, enc_key_lo)
+    
+    return 
+
+def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     pass
 
-def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi_list, enc_key_lo_list):
-    pass
+def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+    return _xor_operation(engine_context, enc_key_hi, enc_key_lo)
 
-def _xor(engine_context: CKKS_EngineContext, enc_key_hi_list, enc_key_lo_list):
-    return _xor_operation(engine_context, enc_key_hi_list, enc_key_lo_list)
-
-def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
+def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     pass

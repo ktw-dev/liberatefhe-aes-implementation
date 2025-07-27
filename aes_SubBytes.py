@@ -2,13 +2,9 @@ import json
 import os
 import numpy as np
 from typing import Any, List, Tuple, Dict
-from dataclasses import dataclass
 from engine_context import CKKS_EngineContext
+from aes_transform_zeta import int_cipher_to_zeta_cipher
 
-@dataclass
-class NibblePack:
-    hi: Any
-    lo: Any
 _BASE = os.path.dirname(__file__)
 _COEFF_PATH = os.path.join(_BASE, "coeffs", "sbox_coeffs.json")
 with open(_COEFF_PATH, "r", encoding="utf-8") as f:
@@ -22,7 +18,7 @@ _PT_COEFFS_CACHE: Dict[int, Tuple[np.ndarray, np.ndarray]] = {}
 def _pre_encode_coeffs(engine: Any) -> Tuple[np.ndarray, np.ndarray]:
     print("\nINFO: Pre-encoding S-Box coefficients for the first time...")
     pt_c_hi, pt_c_lo = np.empty_like(C_hi, dtype=object), np.empty_like(C_lo, dtype=object)
-    slot_count = engine.slot_count
+    slot_count = 16 * 2048
     for i in range(_DEG + 1):
         for j in range(_DEG + 1):
             if abs(C_hi[i, j]) >= _EPS: pt_c_hi[i, j] = engine.encode(np.full(slot_count, C_hi[i, j]))
@@ -48,7 +44,7 @@ def _sum_terms_tree(engine_context: CKKS_EngineContext, terms: List[Any]) -> Any
     return terms[0]
 
 
-def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> NibblePack:
+def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tuple[Any, Any]:
     engine = engine_context.get_engine()
     rlk = engine_context.get_relinearization_key()
     conj_key = engine_context.get_conjugation_key()
@@ -95,8 +91,11 @@ def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Nib
         term_lo = engine.multiply(chunk_results_lo[m], ct_lo_pow_k, rlk)
         final_result_lo = engine.add(final_result_lo, term_lo)
     
-    return NibblePack(hi=final_result_hi, lo=final_result_lo)
+    final_result_hi = int_cipher_to_zeta_cipher(engine_context, final_result_hi)
+    final_result_lo = int_cipher_to_zeta_cipher(engine_context, final_result_lo)
+    
+    return final_result_hi, final_result_lo
 
 # API with context first
-def sub_bytes(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> NibblePack:
+def sub_bytes(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return sbox_poly(engine_context, ct_hi, ct_lo)
