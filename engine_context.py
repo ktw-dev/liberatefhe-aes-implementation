@@ -127,8 +127,9 @@ class CKKS_EngineContext:
         self.fixed_rotation_key_list = [key for _, key in self._fixed_rot_store.items()]
 
         # Some applications may not need small bootstrap; keep optional
-        self.small_bootstrap_key = self.engine.create_small_bootstrap_key(self.secret_key)
-        self.bootstrap_key = self.engine.create_bootstrap_key(self.secret_key)
+        if use_bootstrap  and signature == 1:
+            self.small_bootstrap_key = self.engine.create_small_bootstrap_key(self.secret_key)
+            self.bootstrap_key = self.engine.create_bootstrap_key(self.secret_key)
 
     # ---------------------------------------------------------------------
     # Representation helpers
