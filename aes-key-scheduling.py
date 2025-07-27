@@ -70,45 +70,45 @@ __all__ = [
 ]
 
 
-def rot_word(engine_context, enc_key_hi_list, enc_key_lo_list):
+def rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     """Apply RotWord operation to the first 4 word (bytes 0-3) of flat key array.
     
     Performs circular left shift by 1 byte on the first 4-byte word.
+    Uses element-wise multiplication for masking without indexing/slicing.
     
     Parameters
     ----------
-    engine_context : FHEContext
-    enc_key_hi_list : list[engine.Ciphertext]
-        List of ciphertexts where each ciphertext encrypts 2048 elements parallelly
-    enc_key_lo_list : list[engine.Ciphertext]
-        List of ciphertexts where each ciphertext encrypts 2048 elements parallelly
+    flat_key : np.ndarray, shape (16 * max_blocks,), dtype=np.uint8
+        Flat key array where each byte is repeated max_blocks times
+    max_blocks : int, optional
+        Number of blocks in the SIMD structure (default 2048)
         
     Returns
     -------
-    rotated_hi_list : list[engine.Ciphertext]
-        List of ciphertexts where each ciphertext encrypts 2048 elements parallelly
-    rotated_lo_list : list[engine.Ciphertext]
-        List of ciphertexts where each ciphertext encrypts 2048 elements parallelly
+    rotated : np.ndarray, same shape as flat_key
+        Key array with RotWord applied to first 4 word (positions 0-3)
 
     -------
     example: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] -> [2, 3, 4, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     """
+    max_blocks = 2048
+    first_bytes_mask = np.concatenate([np.ones(max_blocks), np.zeros(15 * max_blocks)])
+    secondtofourth_bytes_mask = np.concatenate([np.zeros(max_blocks), np.ones(3 * max_blocks), np.zeros(12 * max_blocks)])
+    remained_bytes_mask = np.concatenate([np.zeros(4 * max_blocks), np.ones(12 * max_blocks)])
 
-    # 1. Slicing first 4 bytes of two lists
-    enc_key_hi_list_first_4 = [enc_key_hi_list[:4]]
-    enc_key_hi_list_remained = [enc_key_hi_list[4:]]
-    enc_key_lo_list_first_4 = [enc_key_lo_list[:4]]
-    enc_key_lo_list_remained = [enc_key_lo_list[4:]]
+
+    # Extract bytes using masks
+    first_bytes = flat_key * first_bytes_mask
+    secondtofourth_bytes = flat_key * secondtofourth_bytes_mask
+    remained_bytes = flat_key * remained_bytes_mask
     
-    # 2. Rotate first 4 bytes
-    enc_key_hi_list_first_4_rotated = np.roll(enc_key_hi_list_first_4, -1)
-    enc_key_lo_list_first_4_rotated = np.roll(enc_key_lo_list_first_4, -1)
-    
-    # 4. Concatenate rotated bytes and remained bytes
-    enc_key_hi_list_concatenated = np.concatenate(enc_key_hi_list_first_4_rotated, enc_key_hi_list_remained)
-    enc_key_lo_list_concatenated = np.concatenate(enc_key_lo_list_first_4_rotated, enc_key_lo_list_remained)
-    
-    return enc_key_hi_list_concatenated, enc_key_lo_list_concatenated
+    # Apply RotWord: [first, second, third, fourth] -> [second, third, fourth, first]
+    # Move secondtofourth_bytes to positions 0,1,2 and first_bytes to position 3
+    new_positions_012 = np.roll(secondtofourth_bytes, -1*2048)
+    new_position_3 = np.roll(first_bytes, 3*2048)
+
+    rotated = (new_positions_012 + new_position_3 + remained_bytes)
+    return rotated.astype(np.uint8)
 
 def sub_word(engine_context, enc_key_hi_list, enc_key_lo_list):
     pass

@@ -214,7 +214,9 @@ if __name__ == "__main__":
         raise SystemExit("❌  Block count must be between 1 and 2048 inclusive.")
     
     # --- Engine initiation stage -----------------------------------------------
-    engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, use_multiparty = False, thread_count = 16, device_id = 0)
+    fixed_rotation = True
+    delta_list = [1*2048, 2*2048, 3*2048, 4*2048, -1*2048, -2*2048, -3*2048, -4*2048]
+    engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, use_multiparty = False, thread_count = 16, device_id = 0, fixed_rotation=fixed_rotation, delta_list=delta_list)
     
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()

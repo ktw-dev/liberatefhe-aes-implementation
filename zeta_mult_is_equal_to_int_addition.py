@@ -36,7 +36,8 @@ def gf_mult_4bit(a: int, b: int) -> int:
 
 ctx = CKKS_EngineContext(
     1,  # signature 1
-    mode="cpu",  # 'parallel' may not be recognised; use CPU with threads
+    mode="parallel",  # 'parallel' may not be recognised; use CPU with threads
+    use_bootstrap=True,
     thread_count=16,
     device_id=0,
 )
@@ -58,11 +59,19 @@ zeta_b = transform_to_zeta(ints_b)
 ct_a = engine.encrypt(zeta_a.tolist(), ctx.get_public_key())
 ct_b = engine.encrypt(zeta_b.tolist(), ctx.get_public_key())
 
+# 1. Homomorphic multiplication (slot-wise)
 # Homomorphic multiplication (slot-wise)
 ct_c = engine.multiply(ct_a, ct_b)
 
 # Decrypt back
 zeta_c = np.array(engine.decrypt(ct_c, ctx.get_secret_key()))
+
+# 2. Homomorphic addition (slot-wise)
+ct_c = engine.add(ct_a, ct_b)
+
+# Decrypt back
+zeta_added_c = np.array(engine.decrypt(ct_c, ctx.get_secret_key()))
+
 
 # -----------------------------------------------------------------------------
 # Compare against GF(2^4) multiplication
@@ -80,7 +89,27 @@ print(f"Total slots: 16; mismatches: {len(mismatches)}")
 
 if mismatches:
     print("First mismatches (up to 10):")
-    for idx, a, b, gf, z in mismatches[:10]:
+    for idx, a, b, gf, z in mismatches[:16]:
         print(f"  slot {idx}: {a}×{b} → GF={gf}, ζ-mul={z}")
 else:
     print("All slots match (unexpected).")
+    
+print(zeta_c[:16])
+zeta_2_int = []
+for z in zeta_c[:16]:
+    zeta_2_int.append(angle_to_int(z))
+    
+print(ints_a)
+print(ints_b)
+print(zeta_2_int)
+
+print("결론: zeta 위상에서의 곱은 정수에서의 16 모듈러 합과 동일하다.")
+
+# checking zeta_added_c
+print(zeta_added_c[:16])
+zeta_added_2_int = []
+for z in zeta_added_c[:16]:
+    zeta_added_2_int.append(angle_to_int(z))
+
+print(zeta_added_2_int)
+print(ints_a + ints_b)

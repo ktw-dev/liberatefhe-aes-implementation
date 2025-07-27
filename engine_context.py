@@ -86,6 +86,7 @@ class CKKS_EngineContext:
         self.rotation_key = self.engine.create_rotation_key(self.secret_key)
 
         if fixed_rotation and delta_list is not None:
+            print(f"Creating {delta_list} fixed rotation keys")
             for delta in delta_list:
                 self.fixed_rotation_key_list.append(self.engine.create_fixed_rotation_key(self.secret_key, delta))
 
