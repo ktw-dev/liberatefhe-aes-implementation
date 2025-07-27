@@ -1,102 +1,103 @@
-"""aes-SubBytes.py
+# aes_SubBytes.py (최종 수정본)
 
-SubBytes operation for AES-128 ECB mode with FHE compatibility.
-
-The SubBytes operation applies the AES S-box transformation to each byte
-in the state. For FHE compatibility, we work with nibbles (4-bit values)
-and use lookup tables.
-
-Implementation strategy:
-1. Split each byte into upper and lower nibbles
-2. Apply S-box transformation using lookup tables
-3. Recombine nibbles back to bytes
-"""
-from __future__ import annotations
-
+import json
+import os
 import numpy as np
+from typing import Any, List, Tuple, Dict
+from dataclasses import dataclass
+from engine_context import CKKS_EngineContext
 
-__all__ = [
-    "sub_bytes",
-    "AES_SBOX",
-]
+@dataclass
+class NibblePack:
+    hi: Any
+    lo: Any
+_BASE = os.path.dirname(__file__)
+_COEFF_PATH = os.path.join(_BASE, "coeffs", "sbox_coeffs.json")
+with open(_COEFF_PATH, "r", encoding="utf-8") as f:
+    _data = json.load(f)
+C_hi: np.ndarray = (np.array(_data["sbox_upper_mv_coeffs_real"]) + 1j * np.array(_data["sbox_upper_mv_coeffs_imag"]))
+C_lo: np.ndarray = (np.array(_data["sbox_lower_mv_coeffs_real"]) + 1j * np.array(_data["sbox_lower_mv_coeffs_imag"]))
+_DEG = C_hi.shape[0] - 1
+_EPS = 1e-12
+_PT_COEFFS_CACHE: Dict[int, Tuple[np.ndarray, np.ndarray]] = {}
 
-# AES S-box lookup table
-AES_SBOX = np.array([
-    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
-    0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
-    0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
-    0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
-    0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
-    0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
-    0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
-    0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
-    0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
-    0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
-    0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
-    0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
-    0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
-    0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
-    0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
-    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
-], dtype=np.uint8)
+def _pre_encode_coeffs(engine: Any) -> Tuple[np.ndarray, np.ndarray]:
+    print("\nINFO: Pre-encoding S-Box coefficients for the first time...")
+    pt_c_hi, pt_c_lo = np.empty_like(C_hi, dtype=object), np.empty_like(C_lo, dtype=object)
+    slot_count = engine.slot_count
+    for i in range(_DEG + 1):
+        for j in range(_DEG + 1):
+            if abs(C_hi[i, j]) >= _EPS: pt_c_hi[i, j] = engine.encode(np.full(slot_count, C_hi[i, j]))
+            if abs(C_lo[i, j]) >= _EPS: pt_c_lo[i, j] = engine.encode(np.full(slot_count, C_lo[i, j]))
+    print("INFO: Coefficient pre-encoding complete.")
+    return pt_c_hi, pt_c_lo
 
+def _build_optimized_power_basis(ct: Any, context: CKKS_EngineContext) -> Dict[int, Any]:
+    engine, rlk, conj_key = context.get_engine(), context.get_relinearization_key(), context.get_conjugation_key()
+    basis: Dict[int, Any] = {}
+    pos_basis = engine.make_power_basis(ct, 8, rlk)
+    for i, c in enumerate(pos_basis, start=1): basis[i] = c
+    for i in range(1, 8): basis[16 - i] = engine.conjugate(pos_basis[i - 1], conj_key)
+    basis[0] = engine.encrypt(np.ones(engine.slot_count, dtype=np.complex128), context.get_public_key())
+    return basis
 
-def sub_bytes(state: np.ndarray) -> np.ndarray:
-    """Apply SubBytes transformation using AES S-box.
-    
-    Parameters
-    ----------
-    state : np.ndarray, shape (16 * max_blocks,), dtype uint8
-        Flat state array from blocks_to_flat_array()
-    
-    Returns
-    -------
-    new_state : np.ndarray, shape (16 * max_blocks,), dtype uint8
-        State after S-box substitution
-    """
-    if state.dtype != np.uint8:
-        state = state.astype(np.uint8, copy=False)
-    
-    # Direct S-box lookup - NumPy's advanced indexing is vectorized
-    return AES_SBOX[state]
+def _sum_terms_tree(terms: List[Any], context: CKKS_EngineContext) -> Any:
+    engine = context.get_engine()
+    if not terms: return engine.encrypt(np.zeros(engine.slot_count), context.get_public_key())
+    while len(terms) > 1:
+        new_terms = [engine.add(terms[i], terms[i + 1]) if i + 1 < len(terms) else terms[i] for i in range(0, len(terms), 2)]
+        terms = new_terms
+    return terms[0]
 
 
-if __name__ == "__main__":
-    # Test SubBytes operation
-    import pathlib
-    import importlib.util
+def sbox_poly(ct_hi: Any, ct_lo: Any, context: CKKS_EngineContext) -> NibblePack:
+    engine = context.get_engine()
+    rlk = context.get_relinearization_key()
+    conj_key = context.get_conjugation_key()
+    engine_id = id(engine)
+    if engine_id not in _PT_COEFFS_CACHE:
+        _PT_COEFFS_CACHE[engine_id] = _pre_encode_coeffs(engine)
+    pt_c_hi, pt_c_lo = _PT_COEFFS_CACHE[engine_id]
+
+    hi_basis = _build_optimized_power_basis(ct_hi, context)
+    lo_basis = _build_optimized_power_basis(ct_lo, context)
+
+    k = 4
+    num_chunks = (_DEG + 1) // k
+    chunk_results_hi, chunk_results_lo = [], []
+
+    for m in range(num_chunks):
+        baby_step_terms_hi, baby_step_terms_lo = [], []
+        for i in range(k):
+            inner_terms_hi, inner_terms_lo = [], []
+            for j in range(_DEG + 1):
+                idx_y = i + m * k
+                ct_hi_pow = hi_basis[j]
+                if abs(C_hi[j, idx_y]) >= _EPS:
+                    inner_terms_hi.append(engine.multiply(ct_hi_pow, pt_c_hi[j, idx_y]))
+                if abs(C_lo[j, idx_y]) >= _EPS:
+                    inner_terms_lo.append(engine.multiply(ct_hi_pow, pt_c_lo[j, idx_y]))
+            
+            inner_sum_hi = _sum_terms_tree(inner_terms_hi, context)
+            inner_sum_lo = _sum_terms_tree(inner_terms_lo, context)
+            
+            ct_lo_pow = lo_basis[i]
+            baby_step_terms_hi.append(engine.multiply(inner_sum_hi, ct_lo_pow, rlk))
+            baby_step_terms_lo.append(engine.multiply(inner_sum_lo, ct_lo_pow, rlk))
+
+        chunk_results_hi.append(_sum_terms_tree(baby_step_terms_hi, context))
+        chunk_results_lo.append(_sum_terms_tree(baby_step_terms_lo, context))
+
+    final_result_hi = chunk_results_hi[0]
+    final_result_lo = chunk_results_lo[0]
+    for m in range(1, num_chunks):
+        ct_lo_pow_k = lo_basis[m * k]
+        term_hi = engine.multiply(chunk_results_hi[m], ct_lo_pow_k, rlk)
+        final_result_hi = engine.add(final_result_hi, term_hi)
+        term_lo = engine.multiply(chunk_results_lo[m], ct_lo_pow_k, rlk)
+        final_result_lo = engine.add(final_result_lo, term_lo)
     
-    # Load helper modules
-    def _load_module(fname: str, alias: str):
-        path = pathlib.Path(__file__).parent / fname
-        spec = importlib.util.spec_from_file_location(alias, path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-    
-    aes_block_array = _load_module("aes_block_array.py", "aes_block_array")
-    
-    # Generate test data
-    rng = np.random.default_rng()
-    test_blocks = rng.integers(0, 256, size=(4, 16), dtype=np.uint8)
-    state_flat = aes_block_array.blocks_to_flat_array(test_blocks)
-    
-    # Apply SubBytes
-    result = sub_bytes(state_flat)
-    
-    print("Test SubBytes operation:")
-    print(f"Input shape: {state_flat.shape}")
-    print(f"Output shape: {result.shape}")
-    print(f"First 16 bytes input:  {[f'{b:02X}' for b in state_flat[:16]]}")
-    print(f"First 16 bytes output: {[f'{b:02X}' for b in result[:16]]}")
-    
-    # Test specific known values
-    test_byte = 0x53
-    expected = AES_SBOX[test_byte]  # Should be 0xED
-    test_state = np.array([test_byte], dtype=np.uint8)
-    test_result = sub_bytes(test_state)
-    
-    print(f"\nKnown test: S-box[0x{test_byte:02X}] = 0x{expected:02X}")
-    print(f"Our result: 0x{test_result[0]:02X}")
-    assert test_result[0] == expected, f"S-box lookup failed: expected 0x{expected:02X}, got 0x{test_result[0]:02X}"
-    print("✓ S-box lookup verification passed")
+    return NibblePack(hi=final_result_hi, lo=final_result_lo)
+
+def sub_bytes(ct_hi: Any, ct_lo: Any, context: CKKS_EngineContext) -> NibblePack:
+    return sbox_poly(ct_hi, ct_lo, context)

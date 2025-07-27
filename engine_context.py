@@ -23,6 +23,36 @@ from desilofhe import Engine
 __all__ = ["FHEContext"]
 
 
+class _FixedRotationKeyStore:
+    """Lazy cache mapping rotation deltas (int, can be negative) to FixedRotationKey.
+
+    Usage
+    -----
+    store[delta]  → desilofhe.FixedRotationKey, where delta is normalised modulo slot_count.
+    """
+
+    def __init__(self, engine: "Engine", secret_key: "desilofhe.SecretKey", slot_count: int):
+        self._engine = engine
+        self._sk = secret_key
+        self._slot_count = slot_count
+        self._cache: dict[int, "desilofhe.FixedRotationKey"] = {}
+
+    # dict-style access: store[delta]
+    def __getitem__(self, delta: int):
+        norm = delta % self._slot_count  # support negative values
+        if norm not in self._cache:
+            self._cache[norm] = self._engine.create_fixed_rotation_key(self._sk, norm)
+        return self._cache[norm]
+
+    # len(store) → number of cached keys
+    def __len__(self):
+        return len(self._cache)
+
+    # iteration over cached (delta, key)
+    def items(self):
+        return self._cache.items()
+
+
 class CKKS_EngineContext:
     """High-level container that owns an Engine and all related keys."""
 
@@ -85,10 +115,16 @@ class CKKS_EngineContext:
         self.conjugation_key = self.engine.create_conjugation_key(self.secret_key)
         self.rotation_key = self.engine.create_rotation_key(self.secret_key)
 
+        # Fixed rotation key store (lazy-loaded)
+        self._fixed_rot_store = _FixedRotationKeyStore(self.engine, self.secret_key, self.engine.slot_count)
+
         if fixed_rotation and delta_list is not None:
             print(f"Creating {delta_list} fixed rotation keys")
             for delta in delta_list:
-                self.fixed_rotation_key_list.append(self.engine.create_fixed_rotation_key(self.secret_key, delta))
+                _ = self._fixed_rot_store[delta]  # force creation and caching
+
+        # keep list view for backward compatibility
+        self.fixed_rotation_key_list = [key for _, key in self._fixed_rot_store.items()]
 
         # Some applications may not need small bootstrap; keep optional
         self.small_bootstrap_key = self.engine.create_small_bootstrap_key(self.secret_key)
@@ -129,6 +165,19 @@ class CKKS_EngineContext:
     
     def get_rotation_key(self) -> "desilofhe.RotationKey":
         return self.rotation_key
+    
+    def get_fixed_rotation_key(self, delta: int | None = None):
+        """Return a single FixedRotationKey for *delta*, or list of cached keys.
+
+        Parameters
+        ----------
+        delta : int | None
+            Rotation step. If None, return list of all cached fixed rotation keys.
+        """
+        if delta is None:
+            # up-to-date view of cache
+            return [key for _, key in self._fixed_rot_store.items()]
+        return self._fixed_rot_store[delta]
     
     def get_small_bootstrap_key(self) -> "desilofhe.SmallBootstrapKey":
         return self.small_bootstrap_key

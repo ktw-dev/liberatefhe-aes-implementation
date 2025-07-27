@@ -70,53 +70,84 @@ __all__ = [
 ]
 
 
-def rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     """Apply RotWord operation to the first 4 word (bytes 0-3) of flat key array.
     
-    Performs circular left shift by 1 byte on the first 4-byte word.
-    Uses element-wise multiplication for masking without indexing/slicing.
+    SIMD batching된 키를 입력으로 받아, 첫 행의 4 bytes를 왼쪽으로 1 byte circular shift하는 연산을 취한 후 반환한다.
     
     Parameters
     ----------
-    flat_key : np.ndarray, shape (16 * max_blocks,), dtype=np.uint8
-        Flat key array where each byte is repeated max_blocks times
-    max_blocks : int, optional
-        Number of blocks in the SIMD structure (default 2048)
+    engine_context : CKKS_EngineContext
+    enc_key_hi : Ciphertext
+    enc_key_lo : Ciphertext
         
     Returns
     -------
-    rotated : np.ndarray, same shape as flat_key
-        Key array with RotWord applied to first 4 word (positions 0-3)
+    rotated_hi_bytes : Ciphertext
+    rotated_lo_bytes : Ciphertext
 
     -------
     example: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] -> [2, 3, 4, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     """
+    # load engine and keys
+    engine = engine_context.get_engine()
+    public_key = engine_context.get_public_key()
+    secret_key = engine_context.get_secret_key()
+    relin_key = engine_context.get_relinearization_key()
+    fixed_rotation_key_neg_2048 = engine_context.get_fixed_rotation_key(-2048)
+    fixed_rotation_key_3_2048 = engine_context.get_fixed_rotation_key(3 * 2048)
+    
+    # ------------------------------load masks------------------------------
     max_blocks = 2048
     first_bytes_mask = np.concatenate([np.ones(max_blocks), np.zeros(15 * max_blocks)])
     secondtofourth_bytes_mask = np.concatenate([np.zeros(max_blocks), np.ones(3 * max_blocks), np.zeros(12 * max_blocks)])
     remained_bytes_mask = np.concatenate([np.zeros(4 * max_blocks), np.ones(12 * max_blocks)])
-
-
-    # Extract bytes using masks
-    first_bytes = flat_key * first_bytes_mask
-    secondtofourth_bytes = flat_key * secondtofourth_bytes_mask
-    remained_bytes = flat_key * remained_bytes_mask
     
-    # Apply RotWord: [first, second, third, fourth] -> [second, third, fourth, first]
+    # ------------------------------transform mask to plaintext------------------------------
+    first_bytes_mask_plain = engine.encode(first_bytes_mask, public_key)
+    secondtofourth_bytes_mask_plain = engine.encode(secondtofourth_bytes_mask, public_key)
+    remained_bytes_mask_plain = engine.encode(remained_bytes_mask, public_key)
+    
+    # ------------------------------encrypt masks------------------------------
+    first_bytes_mask_enc = engine.encrypt(first_bytes_mask_plain, public_key)
+    secondtofourth_bytes_mask_enc = engine.encrypt(secondtofourth_bytes_mask_plain, public_key)
+    remained_bytes_mask_enc = engine.encrypt(remained_bytes_mask_plain, public_key)
+    
+    # ------------------------------Masking hi bytes------------------------------
+    first_bytes_enc_hi = engine.multiply(enc_key_hi, first_bytes_mask_enc)
+    secondtofourth_bytes_enc_hi = engine.multiply(enc_key_hi, secondtofourth_bytes_mask_enc)
+    remained_bytes_enc_hi = engine.multiply(enc_key_hi, remained_bytes_mask_enc)
+    
+    # ------------------------------Masking lo bytes------------------------------
+    first_bytes_enc_lo = engine.multiply(enc_key_lo, first_bytes_mask_enc)
+    secondtofourth_bytes_enc_lo = engine.multiply(enc_key_lo, secondtofourth_bytes_mask_enc)
+    remained_bytes_enc_lo = engine.multiply(enc_key_lo, remained_bytes_mask_enc)
+    
+    # ------------------------------Apply RotWord to hi bytes------------------------------
     # Move secondtofourth_bytes to positions 0,1,2 and first_bytes to position 3
-    new_positions_012 = np.roll(secondtofourth_bytes, -1*2048)
-    new_position_3 = np.roll(first_bytes, 3*2048)
+    new_positions_012 = engine.rotate(secondtofourth_bytes_enc_hi, fixed_rotation_key_neg_2048)
+    new_position_3 = engine.fixed_rotate(first_bytes_enc_hi, fixed_rotation_key_3_2048)
 
-    rotated = (new_positions_012 + new_position_3 + remained_bytes)
-    return rotated.astype(np.uint8)
+    rotated_hi_bytes = engine.add(new_positions_012, new_position_3)
+    rotated_hi_bytes = engine.add(rotated_hi_bytes, remained_bytes_enc_hi)
+    
+    # ------------------------------Apply RotWord to lo bytes------------------------------
+    new_positions_012 = engine.rotate(secondtofourth_bytes_enc_lo, fixed_rotation_key_neg_2048)
+    new_position_3 = engine.fixed_rotate(first_bytes_enc_lo, fixed_rotation_key_3_2048)
 
-def sub_word(engine_context, enc_key_hi_list, enc_key_lo_list):
+    rotated_lo_bytes = engine.add(new_positions_012, new_position_3)
+    rotated_lo_bytes = engine.add(rotated_lo_bytes, remained_bytes_enc_lo)
+
+    return rotated_hi_bytes, rotated_lo_bytes
+
+
+def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi_list, enc_key_lo_list):
     pass
 
-def rcon_xor(engine_context, enc_key_hi_list, enc_key_lo_list):
+def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi_list, enc_key_lo_list):
     pass
 
-def xor(engine_context, enc_key_hi_list, enc_key_lo_list):
+def _xor(engine_context: CKKS_EngineContext, enc_key_hi_list, enc_key_lo_list):
     return _xor_operation(engine_context, enc_key_hi_list, enc_key_lo_list)
 
 def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
