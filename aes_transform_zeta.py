@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict, List
+from functools import lru_cache
 
 import numpy as np
 from engine_context import CKKS_EngineContext
@@ -38,6 +39,8 @@ _ZETA = np.exp(-2j * np.pi / 16)
 _PT_I2Z_CACHE: Dict[int, List[Any]] = {}
 
 
+# Cache once per process – coefficients never change
+@lru_cache(maxsize=1)
 def _compute_int2zeta_coeffs() -> np.ndarray:
     """Return array a[0..15] s.t. g(k)=ζ^k with g(t)=Σ a_p t^p."""
     k_vals = np.arange(16)
@@ -46,7 +49,6 @@ def _compute_int2zeta_coeffs() -> np.ndarray:
     A = np.vander(k_vals, N=16, increasing=True)
     coeff = np.linalg.solve(A, f)
     return coeff.astype(complex)
-
 
 _I2Z_COEFF = _compute_int2zeta_coeffs()
 # Determine effective maximum degree required (ignore coefficients ~0)
@@ -67,24 +69,12 @@ def _pre_encode_i2z(engine) -> List[Any]:
     return pt_list
 
 
-# ----------------- power basis & sum helper ----------------------------------
+# ----------------- sum helper ----------------------------------------------
 
-def _build_power_basis(ct: Any, degree: int, ctx: CKKS_EngineContext):
-    engine = ctx.get_engine()
-    rlk = ctx.get_relinearization_key()
-    pub = ctx.get_public_key()
-    slot = engine.slot_count
-    ones = engine.encrypt(np.ones(slot, dtype=np.complex128), pub)
-    basis = [ones, ct]
-    for d in range(2, degree + 1):
-        basis.append(engine.multiply(basis[d - 1], ct, rlk))
-    return basis  # len = degree+1
-
-
-def _sum_terms_tree(terms: List[Any], ctx: CKKS_EngineContext):
-    engine = ctx.get_engine()
+def _sum_terms_tree(engine_context: CKKS_EngineContext, terms: List[Any]):
+    engine = engine_context.get_engine()
     if not terms:
-        return engine.encrypt(np.zeros(engine.slot_count, dtype=np.complex128), ctx.get_public_key())
+        return engine.encrypt(np.zeros(engine.slot_count, dtype=np.complex128), engine_context.get_public_key())
     while len(terms) > 1:
         new_terms = []
         for i in range(0, len(terms), 2):
@@ -98,7 +88,7 @@ def _sum_terms_tree(terms: List[Any], ctx: CKKS_EngineContext):
 
 # ----------------- public API -------------------------------------------------
 
-def int_cipher_to_zeta_cipher(ct_int: Any, ctx: CKKS_EngineContext):
+def int_cipher_to_zeta_cipher(engine_context: CKKS_EngineContext, ct_int: Any):
     """Convert ciphertext encrypting integers 0..15 to ciphertext encrypting ζ^k.
 
     Parameters
@@ -112,14 +102,14 @@ def int_cipher_to_zeta_cipher(ct_int: Any, ctx: CKKS_EngineContext):
     -------
     Ciphertext encrypting ζ^{k} for each slot value k.
     """
-    engine = ctx.get_engine()
+    engine = engine_context.get_engine()
     eid = id(engine)
     if eid not in _PT_I2Z_CACHE:
         _PT_I2Z_CACHE[eid] = _pre_encode_i2z(engine)
     pt_coeffs = _PT_I2Z_CACHE[eid]
 
-    rlk = ctx.get_relinearization_key()
-    conj_key = ctx.get_conjugation_key()
+    rlk = engine_context.get_relinearization_key()
+    conj_key = engine_context.get_conjugation_key()
 
     basis_dict = build_power_basis(engine, ct_int, rlk, conj_key)  # exponents 0..15
 
@@ -127,7 +117,7 @@ def int_cipher_to_zeta_cipher(ct_int: Any, ctx: CKKS_EngineContext):
 
     # Evaluate polynomial Σ a_p t^p
     terms = [engine.multiply(basis[p], pt_coeffs[p]) for p in range(_DEG_I2Z + 1)]
-    return _sum_terms_tree(terms, ctx)
+    return _sum_terms_tree(terms, engine_context)
 
 def __main__():
     arr = np.random.randint(0, 16, size=16*2048, dtype=np.uint8)
