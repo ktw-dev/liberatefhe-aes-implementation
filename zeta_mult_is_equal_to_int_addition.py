@@ -149,10 +149,10 @@ print(f"zeta_c_two_dec_2_int: {zeta_c_two_dec_2_int}")
 print(f"zeta_c_three_dec_2_int: {zeta_c_three_dec_2_int}")
 print(f"zeta_c_four_dec_2_int: {zeta_c_four_dec_2_int}")
 
-print(f"ints_a * 1: {ints_a * 1}")
-print(f"ints_a * 2: {ints_a * 2}")
-print(f"ints_a * 3: {ints_a * 3}")
-print(f"ints_a * 4: {ints_a * 4}")
+print(f"ints_a * 1: {ints_a * 1 % 16}")
+print(f"ints_a * 2: {ints_a * 2 % 16}")
+print(f"ints_a * 3: {ints_a * 3 % 16}")
+print(f"ints_a * 4: {ints_a * 4 % 16}")
 
 
 
