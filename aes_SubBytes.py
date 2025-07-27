@@ -1,5 +1,3 @@
-# aes_SubBytes.py (최종 수정본)
-
 import json
 import os
 import numpy as np
@@ -32,35 +30,35 @@ def _pre_encode_coeffs(engine: Any) -> Tuple[np.ndarray, np.ndarray]:
     print("INFO: Coefficient pre-encoding complete.")
     return pt_c_hi, pt_c_lo
 
-def _build_optimized_power_basis(ct: Any, context: CKKS_EngineContext) -> Dict[int, Any]:
-    engine, rlk, conj_key = context.get_engine(), context.get_relinearization_key(), context.get_conjugation_key()
+def _build_optimized_power_basis(engine_context: CKKS_EngineContext, ct: Any) -> Dict[int, Any]:
+    engine, rlk, conj_key = engine_context.get_engine(), engine_context.get_relinearization_key(), engine_context.get_conjugation_key()
     basis: Dict[int, Any] = {}
     pos_basis = engine.make_power_basis(ct, 8, rlk)
     for i, c in enumerate(pos_basis, start=1): basis[i] = c
     for i in range(1, 8): basis[16 - i] = engine.conjugate(pos_basis[i - 1], conj_key)
-    basis[0] = engine.encrypt(np.ones(engine.slot_count, dtype=np.complex128), context.get_public_key())
+    basis[0] = engine.encrypt(np.ones(engine.slot_count, dtype=np.complex128), engine_context.get_public_key())
     return basis
 
-def _sum_terms_tree(terms: List[Any], context: CKKS_EngineContext) -> Any:
-    engine = context.get_engine()
-    if not terms: return engine.encrypt(np.zeros(engine.slot_count), context.get_public_key())
+def _sum_terms_tree(engine_context: CKKS_EngineContext, terms: List[Any]) -> Any:
+    engine = engine_context.get_engine()
+    if not terms: return engine.encrypt(np.zeros(engine.slot_count), engine_context.get_public_key())
     while len(terms) > 1:
         new_terms = [engine.add(terms[i], terms[i + 1]) if i + 1 < len(terms) else terms[i] for i in range(0, len(terms), 2)]
         terms = new_terms
     return terms[0]
 
 
-def sbox_poly(ct_hi: Any, ct_lo: Any, context: CKKS_EngineContext) -> NibblePack:
-    engine = context.get_engine()
-    rlk = context.get_relinearization_key()
-    conj_key = context.get_conjugation_key()
+def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> NibblePack:
+    engine = engine_context.get_engine()
+    rlk = engine_context.get_relinearization_key()
+    conj_key = engine_context.get_conjugation_key()
     engine_id = id(engine)
     if engine_id not in _PT_COEFFS_CACHE:
         _PT_COEFFS_CACHE[engine_id] = _pre_encode_coeffs(engine)
     pt_c_hi, pt_c_lo = _PT_COEFFS_CACHE[engine_id]
 
-    hi_basis = _build_optimized_power_basis(ct_hi, context)
-    lo_basis = _build_optimized_power_basis(ct_lo, context)
+    hi_basis = _build_optimized_power_basis(engine_context, ct_hi)
+    lo_basis = _build_optimized_power_basis(engine_context, ct_lo)
 
     k = 4
     num_chunks = (_DEG + 1) // k
@@ -78,15 +76,15 @@ def sbox_poly(ct_hi: Any, ct_lo: Any, context: CKKS_EngineContext) -> NibblePack
                 if abs(C_lo[j, idx_y]) >= _EPS:
                     inner_terms_lo.append(engine.multiply(ct_hi_pow, pt_c_lo[j, idx_y]))
             
-            inner_sum_hi = _sum_terms_tree(inner_terms_hi, context)
-            inner_sum_lo = _sum_terms_tree(inner_terms_lo, context)
+            inner_sum_hi = _sum_terms_tree(inner_terms_hi, engine_context)
+            inner_sum_lo = _sum_terms_tree(inner_terms_lo, engine_context)
             
             ct_lo_pow = lo_basis[i]
             baby_step_terms_hi.append(engine.multiply(inner_sum_hi, ct_lo_pow, rlk))
             baby_step_terms_lo.append(engine.multiply(inner_sum_lo, ct_lo_pow, rlk))
 
-        chunk_results_hi.append(_sum_terms_tree(baby_step_terms_hi, context))
-        chunk_results_lo.append(_sum_terms_tree(baby_step_terms_lo, context))
+        chunk_results_hi.append(_sum_terms_tree(baby_step_terms_hi, engine_context))
+        chunk_results_lo.append(_sum_terms_tree(baby_step_terms_lo, engine_context))
 
     final_result_hi = chunk_results_hi[0]
     final_result_lo = chunk_results_lo[0]
@@ -99,5 +97,6 @@ def sbox_poly(ct_hi: Any, ct_lo: Any, context: CKKS_EngineContext) -> NibblePack
     
     return NibblePack(hi=final_result_hi, lo=final_result_lo)
 
-def sub_bytes(ct_hi: Any, ct_lo: Any, context: CKKS_EngineContext) -> NibblePack:
-    return sbox_poly(ct_hi, ct_lo, context)
+# API with context first
+def sub_bytes(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> NibblePack:
+    return sbox_poly(engine_context, ct_hi, ct_lo)
