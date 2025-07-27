@@ -34,6 +34,7 @@ Thumbs.db
 
 # Project-specific
 .taskmaster/
+
 # Large derived arrays (coefficients, model checkpoints, …)
 *.npy
 *.npz
