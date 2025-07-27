@@ -73,10 +73,15 @@ ct_c = engine.add(ct_a, ct_b)
 zeta_added_c = np.array(engine.decrypt(ct_c, ctx.get_secret_key()))
 
 # 3. Homomorphic Constant Multiplication (slot-wise)
+print(f"ct_a.level: {ct_a.level}")
 ct_c_one = engine.multiply(ct_a, ct_a, ctx.get_relinearization_key())
+print(f"ct_c_one.level: {ct_c_one.level}")
 ct_c_two = engine.multiply(ct_c_one, ct_a, ctx.get_relinearization_key())
+print(f"ct_c_two.level: {ct_c_two.level}")
 ct_c_three = engine.multiply(ct_c_two, ct_a, ctx.get_relinearization_key())
+print(f"ct_c_three.level: {ct_c_three.level}")
 ct_c_four = engine.multiply(ct_c_three, ct_a, ctx.get_relinearization_key())
+print(f"ct_c_four.level: {ct_c_four.level}")
 
 # Decrypt back
 zeta_c_one = np.array(engine.decrypt(ct_c_one, ctx.get_secret_key()))
