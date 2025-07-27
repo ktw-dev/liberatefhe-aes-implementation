@@ -117,7 +117,7 @@ def int_cipher_to_zeta_cipher(engine_context: CKKS_EngineContext, ct_int: Any):
 
     # Evaluate polynomial Σ a_p t^p
     terms = [engine.multiply(basis[p], pt_coeffs[p]) for p in range(_DEG_I2Z + 1)]
-    return _sum_terms_tree(terms, engine_context)
+    return _sum_terms_tree(engine_context, terms)
 
 def __main__():
     arr = np.random.randint(0, 16, size=16*2048, dtype=np.uint8)
