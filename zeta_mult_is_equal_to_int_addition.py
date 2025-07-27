@@ -149,12 +149,14 @@ print(f"zeta_c_two_dec_2_int: {zeta_c_two_dec_2_int}")
 print(f"zeta_c_three_dec_2_int: {zeta_c_three_dec_2_int}")
 print(f"zeta_c_four_dec_2_int: {zeta_c_four_dec_2_int}")
 
-print(f"ints_a * 1: {ints_a * 1 % 16}")
 print(f"ints_a * 2: {ints_a * 2 % 16}")
 print(f"ints_a * 3: {ints_a * 3 % 16}")
 print(f"ints_a * 4: {ints_a * 4 % 16}")
 
-
+print(f"checking zeta_c_one_dec_2_int: {zeta_c_one_dec_2_int == ints_a * 2 % 16}")
+print(f"checking zeta_c_two_dec_2_int: {zeta_c_two_dec_2_int == ints_a * 3 % 16}")
+print(f"checking zeta_c_three_dec_2_int: {zeta_c_three_dec_2_int == ints_a * 4 % 16}")
+print(f"checking zeta_c_four_dec_2_int: {zeta_c_four_dec_2_int == ints_a * 5 % 16}")
 
 # checking zeta_added_c
 print(zeta_added_c[:16])
