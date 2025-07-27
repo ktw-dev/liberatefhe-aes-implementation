@@ -19,10 +19,10 @@ def _load_module(fname: str, alias: str):
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
     return module
 
-xor_module = _load_module("aes-xor.py", "xor_operation")
+xor_module = _load_module("aes_xor.py", "xor_operation")
 _xor_operation = xor_module._xor_operation
 
-data_module = _load_module("aes-main-process.py", "data_initiation")
+data_module = _load_module("aes_main_process.py", "data_initiation")
 _data_initiation = data_module.data_initiation
 
 def transform_to_zeta(arr: np.ndarray) -> np.ndarray:

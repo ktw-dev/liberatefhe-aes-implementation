@@ -35,7 +35,7 @@ if __name__ == "__main__":
     import importlib.util
     import pathlib
 
-    blocks_file = pathlib.Path(__file__).with_name("aes-block-array.py")
+    blocks_file = pathlib.Path(__file__).with_name("aes_block_array.py")
 
     spec = importlib.util.spec_from_file_location("aes_block_array", blocks_file)
     aes_block_array = importlib.util.module_from_spec(spec)

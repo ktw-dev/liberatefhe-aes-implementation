@@ -52,7 +52,7 @@ def _load_module(fname: str, alias: str):
     return module
 
 # Dynamically load `aes-xor.py` as module alias `aes_xor`
-_aes_xor_mod = _load_module("aes-xor.py", "aes_xor")
+_aes_xor_mod = _load_module("aes_xor.py", "aes_xor")
 _xor_operation = _aes_xor_mod._xor_operation
 
 

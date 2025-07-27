@@ -74,7 +74,7 @@ if __name__ == "__main__":
         spec.loader.exec_module(module)
         return module
     
-    aes_block_array = _load_module("aes-block-array.py", "aes_block_array")
+    aes_block_array = _load_module("aes_block_array.py", "aes_block_array")
     
     # Generate test data
     rng = np.random.default_rng()

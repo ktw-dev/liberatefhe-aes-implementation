@@ -147,7 +147,7 @@ if __name__ == "__main__":
         spec.loader.exec_module(module)
         return module
     
-    aes_block_array = _load_module("aes-block-array.py", "aes_block_array")
+    aes_block_array = _load_module("aes_block_array.py", "aes_block_array")
     
     # Test with known AES test vector
     # Input: single block with known pattern

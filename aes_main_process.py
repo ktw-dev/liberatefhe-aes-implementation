@@ -45,12 +45,12 @@ def _load_module(fname: str, alias: str):
 
 # Load helper scripts ----------------------------------------------------------
 
-aes_block_array = _load_module("aes-block-array.py", "aes_block_array")
-aes_split_to_nibble = _load_module("aes-split-to-nibble.py", "aes_split_to_nibble")
+aes_block_array = _load_module("aes_block_array.py", "aes_block_array")
+aes_split_to_nibble = _load_module("aes_split_to_nibble.py", "aes_split_to_nibble")
 # key handling utilities
-aes_key_array = _load_module("aes-key-array.py", "aes_key_array")
+aes_key_array = _load_module("aes_key_array.py", "aes_key_array")
 # zeta transform utility
-aes_transform_zeta = _load_module("aes-transform-zeta.py", "aes_transform_zeta")
+aes_transform_zeta = _load_module("aes_transform_zeta.py", "aes_transform_zeta")
 
 # -----------------------------------------------------------------------------
 # Engine Initiation ------------------------------------------------------------
