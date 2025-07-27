@@ -72,6 +72,22 @@ ct_c = engine.add(ct_a, ct_b)
 # Decrypt back
 zeta_added_c = np.array(engine.decrypt(ct_c, ctx.get_secret_key()))
 
+# 3. Homomorphic Constant Multiplication (slot-wise)
+ct_c_one = engine.multiply(ct_a, ct_a, ctx.get_relin_key())
+ct_c_two = engine.multiply(ct_c_one, ct_a, ctx.get_relin_key())
+ct_c_three = engine.multiply(ct_c_two, ct_a, ctx.get_relin_key())
+ct_c_four = engine.multiply(ct_c_three, ct_a, ctx.get_relin_key())
+
+# Decrypt back
+zeta_c_one = np.array(engine.decrypt(ct_c_one, ctx.get_secret_key()))
+zeta_c_two = np.array(engine.decrypt(ct_c_two, ctx.get_secret_key()))
+zeta_c_three = np.array(engine.decrypt(ct_c_three, ctx.get_secret_key()))
+zeta_c_four = np.array(engine.decrypt(ct_c_four, ctx.get_secret_key()))
+
+zeta_c_one_dec = np.array(engine.decrypt(ct_c_one, ctx.get_secret_key()))
+zeta_c_two_dec = np.array(engine.decrypt(ct_c_two, ctx.get_secret_key()))
+zeta_c_three_dec = np.array(engine.decrypt(ct_c_three, ctx.get_secret_key()))
+zeta_c_four_dec = np.array(engine.decrypt(ct_c_four, ctx.get_secret_key()))
 
 # -----------------------------------------------------------------------------
 # Compare against GF(2^4) multiplication
@@ -105,6 +121,41 @@ print(zeta_2_int)
 
 print("결론: zeta 위상에서의 곱은 정수에서의 16 모듈러 합과 동일하다.")
 
+# 정수의 상수곱을 zeta 위상에서의 곱을 여러번 함으로써 구현하기
+
+print(zeta_c_one_dec[:16])
+print(zeta_c_two_dec[:16])
+print(zeta_c_three_dec[:16])
+print(zeta_c_four_dec[:16])
+
+zeta_c_one_dec_2_int = []
+for z in zeta_c_one_dec[:16]:
+    zeta_c_one_dec_2_int.append(angle_to_int(z))
+
+zeta_c_two_dec_2_int = []
+for z in zeta_c_two_dec[:16]:
+    zeta_c_two_dec_2_int.append(angle_to_int(z))
+
+zeta_c_three_dec_2_int = []
+for z in zeta_c_three_dec[:16]:
+    zeta_c_three_dec_2_int.append(angle_to_int(z))
+
+zeta_c_four_dec_2_int = []
+for z in zeta_c_four_dec[:16]:
+    zeta_c_four_dec_2_int.append(angle_to_int(z))
+
+print(f"zeta_c_one_dec_2_int: {zeta_c_one_dec_2_int}")
+print(f"zeta_c_two_dec_2_int: {zeta_c_two_dec_2_int}")
+print(f"zeta_c_three_dec_2_int: {zeta_c_three_dec_2_int}")
+print(f"zeta_c_four_dec_2_int: {zeta_c_four_dec_2_int}")
+
+print(f"ints_a * 1: {ints_a * 1}")
+print(f"ints_a * 2: {ints_a * 2}")
+print(f"ints_a * 3: {ints_a * 3}")
+print(f"ints_a * 4: {ints_a * 4}")
+
+
+
 # checking zeta_added_c
 print(zeta_added_c[:16])
 zeta_added_2_int = []
@@ -113,3 +164,5 @@ for z in zeta_added_c[:16]:
 
 print(zeta_added_2_int)
 print(ints_a + ints_b)
+
+print("결론: zeta 위상에서의 합은 정수 연산과 그 어떤 관계도 없다.")
