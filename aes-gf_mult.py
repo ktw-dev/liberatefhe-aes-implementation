@@ -33,10 +33,10 @@ from typing import Any
 import numpy as np  # Only for type hints; not used inside core logic.
 from engine_context import CKKS_EngineContext
 
-__all__ = ["const_mult_mod16"]
+__all__ = ["gf_mult"]
 
 
-def const_mult_mod16(engine_context: CKKS_EngineContext, ciphertext_base: Any, const: int,
+def gf_mult(engine_context: CKKS_EngineContext, ciphertext_base: Any, const: int,
 ):
     """Return ciphertext encrypting ζ^{a*const} given ct(ζ^a) and small constant.
 
@@ -52,16 +52,8 @@ def const_mult_mod16(engine_context: CKKS_EngineContext, ciphertext_base: Any, c
     engine = engine_context.get_engine()
     relin_key = engine_context.get_relinearization_key()
 
-    if const < 0:
-        raise ValueError("const must be non-negative")
-
-    # Special cases: 0 → encrypt(1); 1 → identity.
-    if const == 0:
-        ones = [1.0] * engine.slot_count
-        return engine.encrypt(ones, engine_context.get_public_key())
     if const == 1:
         return ciphertext_base
-
     # Naive repeated multiplication.
     result = ciphertext_base
     for _ in range(const - 1):
