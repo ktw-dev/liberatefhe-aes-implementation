@@ -21,7 +21,7 @@ from desilofhe import Engine  # pylint: disable=import-error
 # Parameters
 # -----------------------------------------------------------------------------
 DEGREE      = 15    # Maximum exponent needed for XOR polynomial
-COEFFS_JSON = Path(__file__).with_name("xor_mono_coeffs.json")
+COEFFS_JSON = Path(__file__).with_name("coeff/xor_mono_coeffs.json")
 
 # -----------------------------------------------------------------------------
 # Utility functions

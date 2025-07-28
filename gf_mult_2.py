@@ -30,7 +30,7 @@ __all__ = ["gf_mul2"]
 # -----------------------------------------------------------------------------
 
 def _load_coeff(name: str):
-    path = _THIS_DIR / f"gf_mult2_{name}_coeffs.json"
+    path = _THIS_DIR / f"coeff/gf_mult2_{name}_coeffs.json"
     with open(path, "r", encoding="utf-8") as f:
         obj = json.load(f)
     entries = obj["entries"]
@@ -102,6 +102,7 @@ def gf_mul_2(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
 # -----------------------------------------------------------------------------
 import time
 import math
+from aes_xor import _xor_operation
 
 GF_MULT_2 = np.array([
     0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e, 0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
@@ -169,26 +170,56 @@ if __name__ == "__main__":
     # 1-1. gf_mult_2 of alpha << 4 | beta int
     alpha_beta_int = (alpha_int_16 << 4) | beta_int_16
     alpha_beta_int_gf_mult_2 = gf_mult_2_lookup(alpha_beta_int)
-    print(alpha_beta_int_gf_mult_2)
+    
+    # 1-2. gf_mult_3 of alpha << 4 | beta int
+    alpha_beta_int_gf_mult_3 = alpha_beta_int_gf_mult_2 ^ alpha_beta_int
+    
+    
+    print(f"alpha_beta_int_gf_mult_2[:16]: {alpha_beta_int_gf_mult_2[:16]}")
+    print(f"alpha_beta_int_gf_mult_3[:16]: {alpha_beta_int_gf_mult_3[:16]}")
     
     # 2. transform to zeta domain
     alpha_int_zeta = int_to_zeta(alpha_int)
     beta_int_zeta = int_to_zeta(beta_int)
-    enc_alpha_int_zeta = engine.encrypt(alpha_int_zeta, public_key, level=7)
-    enc_beta_int_zeta = engine.encrypt(beta_int_zeta, public_key, level=7)
+    
+    enc_alpha_int_zeta = engine.encrypt(alpha_int_zeta, public_key, level=10)
+    enc_beta_int_zeta = engine.encrypt(beta_int_zeta, public_key, level=10)
     
     start_time = time.time()
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
-    
     print(f"gf_mul_2 time: {end_time - start_time} seconds")
+    
+    
+    start_time = time.time()
+    ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    print("xor")
+    ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
+    ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
+    print("xor fin")
+    end_time = time.time()
+    print(f"gf_mul_3 time: {end_time - start_time} seconds")
+    
+    start_time = time.time()
     
     dec_ct_hi = engine.decrypt(ct_hi, secret_key)
     dec_ct_lo = engine.decrypt(ct_lo, secret_key)
-
+    
+    dec_ct_hi_3 = engine.decrypt(ct_hi_3, secret_key)
+    dec_ct_lo_3 = engine.decrypt(ct_lo_3, secret_key)
     
     int_dec_ct_hi = zeta_to_int(dec_ct_hi)
     int_dec_ct_lo = zeta_to_int(dec_ct_lo)
-    print(int_dec_ct_hi[:16])
+    
+    int_dec_ct_hi_3 = zeta_to_int(dec_ct_hi_3)
+    int_dec_ct_lo_3 = zeta_to_int(dec_ct_lo_3)
+    
+    print(int_dec_ct_hi[:16] * 16)
     print(int_dec_ct_lo[:16])
+    
+    print(int_dec_ct_hi_3[:16] * 16)
+    print(int_dec_ct_lo_3[:16])
+
+    
+    
     
