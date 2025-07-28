@@ -100,3 +100,11 @@ def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tup
 # API with context first
 def sub_bytes(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return sbox_poly(engine_context, ct_hi, ct_lo)
+
+
+
+def main():
+    pass
+
+if __name__ == "__main__":
+    main()
