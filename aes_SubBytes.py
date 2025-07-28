@@ -6,7 +6,7 @@ from engine_context import CKKS_EngineContext
 from aes_transform_zeta import int_cipher_to_zeta_cipher
 
 _BASE = os.path.dirname(__file__)
-_COEFF_PATH = os.path.join(_BASE, "coeffs", "sbox_coeffs.json")
+_COEFF_PATH = os.path.join(_BASE, "sbox_coeff.json")
 with open(_COEFF_PATH, "r", encoding="utf-8") as f:
     _data = json.load(f)
 C_hi: np.ndarray = (np.array(_data["sbox_upper_mv_coeffs_real"]) + 1j * np.array(_data["sbox_upper_mv_coeffs_imag"]))
