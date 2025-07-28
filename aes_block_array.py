@@ -42,9 +42,10 @@ def blocks_to_flat_array(blocks, max_blocks: int = 2048) -> np.ndarray:
         raise ValueError(f"Too many blocks ({n_blocks} > {max_blocks})")
 
     # Allocate 16 × max_blocks matrix, zero-initialised
-    matrix = np.zeros((16, max_blocks), dtype=np.uint8)
-    # Place the actual data – transpose to align bytes per position
-    matrix[:, :n_blocks] = blocks.T
+    # matrix = np.zeros((16, max_blocks), dtype=np.uint8)
+    # # Place the actual data – transpose to align bytes per position
+    # matrix[:, :n_blocks] = blocks.T
+    matrix = blocks.T
 
     # Flatten row-wise so each byte position segment is contiguous
     return matrix.reshape(-1)
@@ -62,13 +63,15 @@ if __name__ == "__main__":
         raise SystemExit("❌  Block count must be between 0 and 2048.")
 
     # Generate random blocks: each byte uniform in 0x00–0xFF
+    
     rng = np.random.default_rng()
     blocks = rng.integers(0, 256, size=(count, 16), dtype=np.uint8)
 
+    print(blocks[:16])
     flat = blocks_to_flat_array(blocks)
 
     print("Generated flat array (length =", flat.size, ")")
     print("First 16 bytes:", flat[:16]) 
-    print("Second 64 bytes:", flat[2048:2064]) 
+    print("Second 16 bytes:", flat[2048:2064]) 
     
     
