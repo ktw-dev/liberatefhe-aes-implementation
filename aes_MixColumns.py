@@ -93,6 +93,7 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # -------------------------------------------------------
     # 각 xor마다 level 5 감소
     mixed_ct_hi = _xor_operation(engine_context, one_ct_hi, two_ct_hi)
+    mixed_ct_hi = engine.bootstrap
     mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)
     mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
     
@@ -101,3 +102,42 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, four_ct_lo)
     
     return mixed_ct_hi, mixed_ct_lo
+
+
+from aes_transform_zeta import int_to_zeta, zeta_to_int
+import time
+
+if __name__ == "__main__":
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
+    engine = engine_context.engine
+    public_key = engine_context.public_key
+    secret_key = engine_context.secret_key
+    relinearization_key = engine_context.relinearization_key
+    conjugation_key = engine_context.conjugation_key
+    bootstrap_key = engine_context.bootstrap_key
+    
+    # 1. Encrypt inputs
+    np.random.seed(42)
+    alpha_int = np.random.randint(0, 16, size=32768, dtype=np.uint8)
+    beta_int  = np.random.randint(0, 16, size=32768, dtype=np.uint8)
+    expected_int = np.bitwise_xor(alpha_int, beta_int)
+
+    # Map to zeta domain
+    alpha = int_to_zeta(alpha_int)
+    beta  = int_to_zeta(beta_int)
+    
+    enc_alpha = engine.encrypt(alpha, public_key)
+    enc_beta = engine.encrypt(beta, public_key)
+    
+    # 2. Evaluate MixColumns operation
+    start_time = time.time()
+    cipher_res = mix_columns(engine_context, enc_alpha, enc_beta)
+    end_time = time.time()
+    print(f"XOR time taken: {end_time - start_time} seconds")
+
+    start_time = time.time()
+    # 3. Decrypt result
+    decoded_zeta = engine.decrypt(cipher_res, secret_key)
+    decoded_int = zeta_to_int(decoded_zeta)
+    
+    print(np.all(decoded_int == expected_int))

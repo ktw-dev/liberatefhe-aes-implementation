@@ -199,12 +199,19 @@ if __name__ == "__main__":
     
     
     start_time = time.time()
+    print("gf_mul_2.level", ct_hi.level)
+    
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
-    print("xor")
+    
+    print("xor.level", ct_hi.level)
+    
     ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
     ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
-    print("xor fin")
+    
+    print("gf_mul_3.level", ct_hi_3.level)
+    
     end_time = time.time()
+    
     print(f"gf_mul_3 time: {end_time - start_time} seconds")
     
     start_time = time.time()
