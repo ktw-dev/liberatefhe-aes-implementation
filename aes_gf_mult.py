@@ -59,3 +59,7 @@ def gf_mult(engine_context: CKKS_EngineContext, ciphertext_base: Any, const: int
     for _ in range(const - 1):
         result = engine.multiply(result, ciphertext_base, relin_key)
     return result 
+
+
+if __name__ == "__main__":
+    pass

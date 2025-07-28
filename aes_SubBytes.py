@@ -91,6 +91,7 @@ def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tup
         term_lo = engine.multiply(chunk_results_lo[m], ct_lo_pow_k, rlk)
         final_result_lo = engine.add(final_result_lo, term_lo)
     
+    # 지금까지의 결과는 정수 형태이므로, 이를 ζ 형태로 변환한다. 
     final_result_hi = int_cipher_to_zeta_cipher(engine_context, final_result_hi)
     final_result_lo = int_cipher_to_zeta_cipher(engine_context, final_result_lo)
     

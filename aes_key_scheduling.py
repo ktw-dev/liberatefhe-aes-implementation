@@ -88,7 +88,7 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     rotated_lo_bytes : Ciphertext
 
     -------
-    example: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] -> [2, 3, 4, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    example: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] -> [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 13]
     """
     # load engine and keys
     engine = engine_context.get_engine()
@@ -100,52 +100,51 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     
     # ------------------------------load masks------------------------------
     max_blocks = 2048
-    first_bytes_mask = np.concatenate([np.ones(max_blocks), np.zeros(15 * max_blocks)])
-    secondtofourth_bytes_mask = np.concatenate([np.zeros(max_blocks), np.ones(3 * max_blocks), np.zeros(12 * max_blocks)])
-    remained_bytes_mask = np.concatenate([np.zeros(4 * max_blocks), np.ones(12 * max_blocks)])
+    _13_bytes_mask = np.concatenate([np.zeros(12 * max_blocks), np.ones(max_blocks), np.zeros(3 * max_blocks)])
+    _141516_bytes_mask = np.concatenate([np.zeros(13 * max_blocks), np.ones(3 * max_blocks)])
+    _remained_bytes_mask = np.concatenate([np.ones(12 * max_blocks), np.zeros(4 * max_blocks)])
     
     # ------------------------------transform mask to plaintext------------------------------
-    first_bytes_mask_plain = engine.encode(first_bytes_mask, public_key)
-    secondtofourth_bytes_mask_plain = engine.encode(secondtofourth_bytes_mask, public_key)
-    remained_bytes_mask_plain = engine.encode(remained_bytes_mask, public_key)
+    _13_bytes_mask_plain = engine.encode(_13_bytes_mask, public_key)
+    _141516_bytes_mask_plain = engine.encode(_141516_bytes_mask, public_key)
+    _remained_bytes_mask_plain = engine.encode(_remained_bytes_mask, public_key)
     
     # ------------------------------encrypt masks------------------------------
-    first_bytes_mask_enc = engine.encrypt(first_bytes_mask_plain, public_key)
-    secondtofourth_bytes_mask_enc = engine.encrypt(secondtofourth_bytes_mask_plain, public_key)
-    remained_bytes_mask_enc = engine.encrypt(remained_bytes_mask_plain, public_key)
+    _13_bytes_mask_enc = engine.encrypt(_13_bytes_mask_plain, public_key)
+    _141516_bytes_mask_enc = engine.encrypt(_141516_bytes_mask_plain, public_key)
+    _remained_bytes_mask_enc = engine.encrypt(_remained_bytes_mask_plain, public_key)
     
     # ------------------------------Masking hi bytes------------------------------
-    first_bytes_enc_hi = engine.multiply(enc_key_hi, first_bytes_mask_enc)
-    secondtofourth_bytes_enc_hi = engine.multiply(enc_key_hi, secondtofourth_bytes_mask_enc)
-    remained_bytes_enc_hi = engine.multiply(enc_key_hi, remained_bytes_mask_enc)
+    _13_bytes_enc_hi = engine.multiply(enc_key_hi, _13_bytes_mask_enc)
+    _141516_bytes_enc_hi = engine.multiply(enc_key_hi, _141516_bytes_mask_enc)
+    _remained_bytes_enc_hi = engine.multiply(enc_key_hi, _remained_bytes_mask_enc)
     
     # ------------------------------Masking lo bytes------------------------------
-    first_bytes_enc_lo = engine.multiply(enc_key_lo, first_bytes_mask_enc)
-    secondtofourth_bytes_enc_lo = engine.multiply(enc_key_lo, secondtofourth_bytes_mask_enc)
-    remained_bytes_enc_lo = engine.multiply(enc_key_lo, remained_bytes_mask_enc)
+    _13_bytes_enc_lo = engine.multiply(enc_key_lo, _13_bytes_mask_enc)
+    _141516_bytes_enc_lo = engine.multiply(enc_key_lo, _141516_bytes_mask_enc)
+    _remained_bytes_enc_lo = engine.multiply(enc_key_lo, _remained_bytes_mask_enc)
     
     # ------------------------------Apply RotWord to hi bytes------------------------------
     # Move secondtofourth_bytes to positions 0,1,2 and first_bytes to position 3
-    new_positions_012 = engine.rotate(secondtofourth_bytes_enc_hi, fixed_rotation_key_neg_2048)
-    new_position_3 = engine.fixed_rotate(first_bytes_enc_hi, fixed_rotation_key_3_2048)
+    new_positions_131415 = engine.rotate(_141516_bytes_enc_hi, fixed_rotation_key_neg_2048)
+    new_position_16 = engine.fixed_rotate(_13_bytes_enc_hi, fixed_rotation_key_3_2048)
 
-    rotated_hi_bytes = engine.add(new_positions_012, new_position_3)
-    rotated_hi_bytes = engine.add(rotated_hi_bytes, remained_bytes_enc_hi)
+    rotated_hi_bytes = engine.add(new_positions_131415, new_position_16)
+    rotated_hi_bytes = engine.add(rotated_hi_bytes, _remained_bytes_enc_hi)
     
     # ------------------------------Apply RotWord to lo bytes------------------------------
-    new_positions_012 = engine.rotate(secondtofourth_bytes_enc_lo, fixed_rotation_key_neg_2048)
-    new_position_3 = engine.fixed_rotate(first_bytes_enc_lo, fixed_rotation_key_3_2048)
+    new_positions_131415 = engine.rotate(_141516_bytes_enc_lo, fixed_rotation_key_neg_2048)
+    new_position_16 = engine.fixed_rotate(_13_bytes_enc_lo, fixed_rotation_key_3_2048)
 
-    rotated_lo_bytes = engine.add(new_positions_012, new_position_3)
-    rotated_lo_bytes = engine.add(rotated_lo_bytes, remained_bytes_enc_lo)
+    rotated_lo_bytes = engine.add(new_positions_131415, new_position_16)
+    rotated_lo_bytes = engine.add(rotated_lo_bytes, _remained_bytes_enc_lo)
 
     return rotated_hi_bytes, rotated_lo_bytes
 
 
 def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
-    nibble_pack = sub_bytes(engine_context, enc_key_hi, enc_key_lo)
-    
-    return 
+    sub_bytes_hi, sub_bytes_lo = sub_bytes(engine_context, enc_key_hi, enc_key_lo)
+    return sub_bytes_hi, sub_bytes_lo
 
 def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     pass
@@ -154,4 +153,36 @@ def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     return _xor_operation(engine_context, enc_key_hi, enc_key_lo)
 
 def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
+    """
+    AES key scheduling algorithm
+    
+    입력으로 들어오는 키를 original key로 하여, 11개의 round key를 생성하는 알고리즘이다.
+    
+    round key는 4개의 워드, 16 bytes로 구성된다.
+    
+    original key, 4 round key, 8 round key, 11 round key를 생성할 때는 rot_word, sub_word, rcon_xor, xor 연산을 사용한다.
+    	
+    - W[0] ~ W[3]: 입력 키 그대로 사용
+	- W[4] = RotWord(SubWord(W[3])) ⊕ Rcon[1] ⊕ W[0]
+	- W[5] = W[4] ⊕ W[1]
+	- W[6] = W[5] ⊕ W[2]
+	- W[7] = W[6] ⊕ W[3]
+	- W[8] = RotWord(SubWord(W[7])) ⊕ Rcon[2] ⊕ W[4]
+	- W[9] = W[8] ⊕ W[5]
+	- W[10] = W[9] ⊕ W[6]
+	- W[11] = W[10] ⊕ W[7]
+	- … 반복해서 …
+	- W[43] = W[42] ⊕ W[39]
+    
+    Parameters
+    ----------
+    engine_context : CKKS_EngineContext
+    enc_key_hi : Ciphertext
+    enc_key_lo : Ciphertext
+    
+    Returns
+    -------
+
+
+    """
     pass
