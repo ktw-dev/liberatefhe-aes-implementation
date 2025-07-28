@@ -105,24 +105,19 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     _remained_bytes_mask = np.concatenate([np.ones(12 * max_blocks), np.zeros(4 * max_blocks)])
     
     # ------------------------------transform mask to plaintext------------------------------
-    _13_bytes_mask_plain = engine.encode(_13_bytes_mask, public_key)
-    _141516_bytes_mask_plain = engine.encode(_141516_bytes_mask, public_key)
-    _remained_bytes_mask_plain = engine.encode(_remained_bytes_mask, public_key)
-    
-    # ------------------------------encrypt masks------------------------------
-    _13_bytes_mask_enc = engine.encrypt(_13_bytes_mask_plain, public_key)
-    _141516_bytes_mask_enc = engine.encrypt(_141516_bytes_mask_plain, public_key)
-    _remained_bytes_mask_enc = engine.encrypt(_remained_bytes_mask_plain, public_key)
+    _13_bytes_mask_plain = engine.encode(_13_bytes_mask)
+    _141516_bytes_mask_plain = engine.encode(_141516_bytes_mask)
+    _remained_bytes_mask_plain = engine.encode(_remained_bytes_mask)
     
     # ------------------------------Masking hi bytes------------------------------
-    _13_bytes_enc_hi = engine.multiply(enc_key_hi, _13_bytes_mask_enc)
-    _141516_bytes_enc_hi = engine.multiply(enc_key_hi, _141516_bytes_mask_enc)
-    _remained_bytes_enc_hi = engine.multiply(enc_key_hi, _remained_bytes_mask_enc)
+    _13_bytes_enc_hi = engine.multiply(enc_key_hi, _13_bytes_mask_plain)
+    _141516_bytes_enc_hi = engine.multiply(enc_key_hi, _141516_bytes_mask_plain)
+    _remained_bytes_enc_hi = engine.multiply(enc_key_hi, _remained_bytes_mask_plain)
     
     # ------------------------------Masking lo bytes------------------------------
-    _13_bytes_enc_lo = engine.multiply(enc_key_lo, _13_bytes_mask_enc)
-    _141516_bytes_enc_lo = engine.multiply(enc_key_lo, _141516_bytes_mask_enc)
-    _remained_bytes_enc_lo = engine.multiply(enc_key_lo, _remained_bytes_mask_enc)
+    _13_bytes_enc_lo = engine.multiply(enc_key_lo, _13_bytes_mask_plain)
+    _141516_bytes_enc_lo = engine.multiply(enc_key_lo, _141516_bytes_mask_plain)
+    _remained_bytes_enc_lo = engine.multiply(enc_key_lo, _remained_bytes_mask_plain)
     
     # ------------------------------Apply RotWord to hi bytes------------------------------
     # Move secondtofourth_bytes to positions 0,1,2 and first_bytes to position 3
