@@ -237,6 +237,7 @@ if __name__ == "__main__":
     
     ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
     bootstrapped_ct_hi_3 = engine.bootstrap(ct_hi_3, relinearization_key, conjugation_key, bootstrap_key)
+    
     ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
     bootstrapped_ct_lo_3 = engine.bootstrap(ct_lo_3, relinearization_key, conjugation_key, bootstrap_key)
     
