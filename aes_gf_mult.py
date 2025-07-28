@@ -210,12 +210,22 @@ if __name__ == "__main__":
     enc_alpha_int_zeta = engine.encrypt(alpha_int_zeta, public_key, level=10)
     enc_beta_int_zeta = engine.encrypt(beta_int_zeta, public_key, level=10)
     
-    start_time = time.time()
-    print("start gf_mul_2.level", enc_alpha_int_zeta.level)
+    # start_time = time.time()
+    # print("start gf_mul_2.level", enc_alpha_int_zeta.level)
+    # ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    # print("after gf_mul_2.level", ct_hi.level)
+    # end_time = time.time()
+    # print(f"gf_mul_2 time: {end_time - start_time} seconds")
+    
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    ct_hi, ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)
     print("after gf_mul_2.level", ct_hi.level)
-    end_time = time.time()
-    print(f"gf_mul_2 time: {end_time - start_time} seconds")
+    
+    bootstrapped_ct_hi_3 = engine.bootstrap(ct_hi, relinearization_key, conjugation_key, bootstrap_key)
+    bootstrapped_ct_lo_3 = engine.bootstrap(ct_lo, relinearization_key, conjugation_key, bootstrap_key)
+    
+    print("booted doublegf_mul_2.level", bootstrapped_ct_hi_3.level)
+
     
     
     start_time = time.time()
@@ -226,9 +236,11 @@ if __name__ == "__main__":
     print("right after gf_mul_2.level", ct_hi.level)
     
     ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
+    bootstrapped_ct_hi_3 = engine.bootstrap(ct_hi_3, relinearization_key, conjugation_key, bootstrap_key)
     ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
+    bootstrapped_ct_lo_3 = engine.bootstrap(ct_lo_3, relinearization_key, conjugation_key, bootstrap_key)
     
-    print("gf_mul_3.level", ct_hi_3.level)
+    print("booted gf_mul_3.level", bootstrapped_ct_hi_3.level)
     
     end_time = time.time()
     
