@@ -123,8 +123,8 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
     upper, lower = aes_split_to_nibble.split_to_nibbles(flat)
 
     # 4. ζ-변환 (SIMD-style) – repeatable vectorized op
-    zeta_upper = aes_transform_zeta.transform_to_zeta(upper)
-    zeta_lower = aes_transform_zeta.transform_to_zeta(lower)
+    zeta_upper = aes_transform_zeta.int_to_zeta(upper)
+    zeta_lower = aes_transform_zeta.int_to_zeta(lower)
     
     # # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
     # zeta_upper_list = [zeta_upper[i:i+2048] for i in range(0, len(zeta_upper), 2048)]
@@ -156,8 +156,8 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
     key_flat = aes_key_array.key_to_flat_array(key, max_blocks)
     key_upper, key_lower = aes_key_array.split_to_nibbles(key_flat)
 
-    key_zeta_upper = aes_transform_zeta.transform_to_zeta(key_upper)
-    key_zeta_lower = aes_transform_zeta.transform_to_zeta(key_lower)
+    key_zeta_upper = aes_transform_zeta.int_to_zeta(key_upper)
+    key_zeta_lower = aes_transform_zeta.int_to_zeta(key_lower)
     
     # # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
     # key_zeta_upper_list = [key_zeta_upper[i:i+2048] for i in range(0, len(key_zeta_upper), 2048)]
