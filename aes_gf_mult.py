@@ -201,7 +201,7 @@ if __name__ == "__main__":
     
     
     start_time = time.time()
-    print("start gf_mul_3.level", ct_hi.level)
+    print("start gf_mul_3.level", enc_alpha_int_zeta.level)
     
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     
