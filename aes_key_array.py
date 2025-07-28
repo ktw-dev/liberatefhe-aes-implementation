@@ -74,6 +74,23 @@ def split_to_nibbles(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return hi, lo
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     # Quick self-test / demo
     rng = np.random.default_rng()

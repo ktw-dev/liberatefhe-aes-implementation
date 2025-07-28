@@ -104,6 +104,24 @@ def gf_mul_3(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     lo_ct = _xor_operation(engine_context, lo_ct, ct_lo)
     return hi_ct, lo_ct
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # -----------------------------------------------------------------------------
 # Test functions
 # -----------------------------------------------------------------------------
@@ -205,7 +223,7 @@ if __name__ == "__main__":
     
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     
-    print("after gf_mul_2.level", ct_hi.level)
+    print("right after gf_mul_2.level", ct_hi.level)
     
     ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
     ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
