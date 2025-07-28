@@ -193,17 +193,19 @@ if __name__ == "__main__":
     enc_beta_int_zeta = engine.encrypt(beta_int_zeta, public_key, level=10)
     
     start_time = time.time()
+    print("start gf_mul_2.level", enc_alpha_int_zeta.level)
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    print("after gf_mul_2.level", ct_hi.level)
     end_time = time.time()
     print(f"gf_mul_2 time: {end_time - start_time} seconds")
     
     
     start_time = time.time()
-    print("gf_mul_2.level", ct_hi.level)
+    print("start gf_mul_3.level", ct_hi.level)
     
     ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     
-    print("xor.level", ct_hi.level)
+    print("after gf_mul_2.level", ct_hi.level)
     
     ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
     ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
