@@ -1,5 +1,5 @@
 """
-inverse_aes_SubBytes.py (리팩토링 최종본)
+aes_inv_SubBytes.py
 ───────────────────────
 • 역할 : 암호문(ζ‑입력)을 AES Inverse S‑Box로 변환하여 제타(ζ) 암호문을 출력.
 • 구조 : aes_SubBytes.py와 동일한 구조로 리팩토링됨.
@@ -13,7 +13,6 @@ from typing import Any, Dict, Tuple, List
 import numpy as np
 
 from engine_context import CKKS_EngineContext
-from aes_SubBytes import NibblePack
 
 # ----------------------------------------------------------------------
 # 1. 계수 로드 및 희소(Sparse) 딕셔너리 생성
@@ -169,10 +168,10 @@ if __name__ == "__main__":
     print(decoded_int_lo)
 
     # 4. Validate against NumPy AES-128 S-Box implementation
-    from aes_128_numpy import S_BOX  # NumPy reference S-Box table
+    from aes_128_numpy import INV_S_BOX  # NumPy reference S-Box table
 
     # Expected SubBytes output using reference table
-    expected_bytes = S_BOX[int_array]
+    expected_bytes = INV_S_BOX[int_array]
 
     # Combine decrypted high/low nibbles from FHE evaluation
     output_bytes = (decoded_int_hi.astype(np.uint8) << 4) | decoded_int_lo.astype(np.uint8)
