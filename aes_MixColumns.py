@@ -38,19 +38,16 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
         ct_lo_out: 두 번째 블록의 결과
         
     ------------------------------------------------------------
-    functions:
-        이 연산은 두 개의 암호문(hi_nibble of ct, low_nibble of ct)을 받아 MixColumns 연산을 수행하고 반환한다.
-        이때 연산은 전체 암호문에 대해 총 6번의 rotate, 2번의 gf_mul_2, 2번의 gf_mul_3를 수행한다.
-        즉, 각 암호문마다 3번의 rotate, 1번의 gf_mul_2, 1번의 gf_mul_3를 수행한다.
-        
-        rotate_batch를 사용하여 각각 -4 * 2048, 8 * 2048, 4 * 2048 만큼 회전한 암호문을 3개 생성한다.
-        original, -4, 8, 4 순서로 각각 one_ct, two_ct, three_ct, four_ct 라고 명명한다.
-        
-        one_ct는 gf_mul_2 연산을 수행하고, two_ct는 gf_mul_3 연산을 수행한다.
-        three_ct와 four_ct는 별도의 연산을 수행하지 않는다.
-        
-        이후 모든 암호문들에 대해 XOR 연산을 수행하고, 결과를 반환하면 연산이 완료된다.
-        
+    Functions / Operation counts
+    ------------------------------------------------------------
+    • rotate_batch : 2 calls (each produces 3 rotations -> 6 rotated ciphertexts)
+    • gf_mul_2     : 1 call
+    • gf_mul_3     : 1 call
+    • bootstrap    : 6 calls (4 pre-XOR, 2 post-XOR)
+    • xor          : 6 calls (3 for high-nibble, 3 for low-nibble)
+    
+    level 소모량
+    
     """
     engine = engine_context.get_engine()
     
@@ -64,11 +61,11 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # -------------- 1. rotate 연산 ----------------------------
     # ----------------------------------------------------------
     # ct_hi 암호문 3개 생성    
-    # 각각 4, 8, 12 만큼 회전한 암호문 3개 생성
+    # 각각 -4, 8, 4 만큼 회전한 암호문 3개 생성
     ct_hi_rot_list = engine.rotate_batch(ct_hi, list_of_fixed_rotation_keys)
     
     # ct_lo 암호문 3개 생성    
-    # 각각 4, 8, 12 만큼 회전한 암호문 3개 생성
+    # 각각 -4, 8, 4 만큼 회전한 암호문 3개 생성
     ct_lo_rot_list = engine.rotate_batch(ct_lo, list_of_fixed_rotation_keys)
     
     # ----------------------------------------------------------
@@ -77,7 +74,7 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # gf_mul_2 연산을 오리지널 암호문에 대해 수행: level 5 소모 
     one_ct_hi, one_ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)    
     
-    # gf_mul_3 연산을 4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행: level 10 소모
+    # gf_mul_3 연산을 -4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행: level 5 소모
     two_ct_hi, two_ct_lo = gf_mul_3(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
     
     three_ct_hi = ct_hi_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
@@ -86,56 +83,47 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     four_ct_hi = ct_hi_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
     four_ct_lo = ct_lo_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
     
-    # -------------------------------------------------------
-    # ------------------ 3. Bootstrap 연산 -------------------
-    # -------------------------------------------------------
-    one_ct_hi_bootstrap = engine.bootstrap(one_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    one_ct_lo_bootstrap = engine.bootstrap(one_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    two_ct_hi_bootstrap = engine.bootstrap(two_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    two_ct_lo_bootstrap = engine.bootstrap(two_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    
-    # DEBUG
-    print(f"one_ct_hi_bootstrap.level: {one_ct_hi_bootstrap.level}")
-    print(f"two_ct_hi_bootstrap.level: {two_ct_hi_bootstrap.level}")
-    print(f"three_ct_hi.level: {three_ct_hi.level}")
-    print(f"four_ct_hi.level: {four_ct_hi.level}")
-    
+
     # -------------------------------------------------------
     # -------------------- 3. XOR 연산 -----------------------
     # -------------------------------------------------------
     # 각 xor마다 level 5 감소
     
     # high nibble
-    mixed_ct_hi = _xor_operation(engine_context, one_ct_hi_bootstrap, two_ct_hi_bootstrap)
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)
+    mixed_ct_hi = _xor_operation(engine_context, one_ct_hi, two_ct_hi) # level 5 감소
     
-    # Bootstrap 연산 수행
-    mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    # bootstrap 연산 수행
+    mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
     
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
-        
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi) # level 5 감소    
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi) # level 5 감소
         
     # low nibble
-    mixed_ct_lo = _xor_operation(engine_context, one_ct_lo_bootstrap, two_ct_lo_bootstrap)
-    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo)
+    mixed_ct_lo = _xor_operation(engine_context, one_ct_lo, two_ct_lo) # level 5 감소
     
     # Bootstrap 연산 수행
-    mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
     
-    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, four_ct_lo)
+    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo) # level 5 감소
+    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, four_ct_lo) # level 5 감소
     
-    # DEBUG
-    print(f"mixed_ct_hi.level: {mixed_ct_hi.level}")
-    print(f"mixed_ct_lo.level: {mixed_ct_lo.level}")
+    # 전체 bootstrap 연산 수행 후 반환
+    mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
+    mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
+    
+    # # DEBUG
+    # print(f"mixed_ct_hi.level: {mixed_ct_hi.level}")
+    # print(f"mixed_ct_lo.level: {mixed_ct_lo.level}")
     
     return mixed_ct_hi, mixed_ct_lo
 
 
 from aes_transform_zeta import int_to_zeta, zeta_to_int
 import time
+from aes_split_to_nibble import split_to_nibbles
 
 if __name__ == "__main__":
-    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=8, device_id=0)
     engine = engine_context.engine
     public_key = engine_context.public_key
     secret_key = engine_context.secret_key
@@ -147,8 +135,47 @@ if __name__ == "__main__":
     
     # 1. Encrypt inputs
     np.random.seed(42)
-    alpha_int = np.random.randint(0, 16, size=32768, dtype=np.uint8)
-    beta_int  = np.random.randint(0, 16, size=32768, dtype=np.uint8)
+    int_array = np.random.randint(0, 255, size=32768, dtype=np.uint8)
+    
+    print(int_array.shape)
+    print(int_array[0], int_array[1 * 2048], int_array[2 * 2048], int_array[3 * 2048], int_array[4 * 2048], int_array[5 * 2048], int_array[6 * 2048], int_array[7 * 2048], int_array[8 * 2048], int_array[9 * 2048], int_array[10 * 2048], int_array[11 * 2048], int_array[12 * 2048], int_array[13 * 2048], int_array[14 * 2048], int_array[15 * 2048])
+    
+    print(int_array[1], int_array[1 * 2048 + 1], int_array[2 * 2048 + 1], int_array[3 * 2048 + 1], int_array[4 * 2048 + 1], int_array[5 * 2048 + 1], int_array[6 * 2048 + 1], int_array[7 * 2048 + 1], int_array[8 * 2048 + 1], int_array[9 * 2048 + 1], int_array[10 * 2048 + 1], int_array[11 * 2048 + 1], int_array[12 * 2048 + 1], int_array[13 * 2048 + 1], int_array[14 * 2048 + 1], int_array[15 * 2048 + 1])
+
+    int_2d_array = int_array.reshape(16, 2048).T.reshape(-1, 4, 4)    
+    print(int_2d_array.shape)
+    print(int_2d_array[0, :, :])
+    print(int_2d_array[1, :, :])
+
+    
+    def mix_columns_numpy(arr: np.ndarray) -> np.ndarray:
+        """
+        NumPy-only MixColumns.
+        arr.dtype must be uint8 and total length a multiple of 16 (4-byte columns).
+        """
+        a = np.asarray(arr, dtype=np.uint8)
+        st = a.copy()
+        # xtime(x) = (x<<1) ^ 0x1B  if MSB=1  (finite-field ×2)
+        def xtime(x):
+            x = x.astype(np.uint16)              # avoid overflow
+            return (((x << 1) & 0xFF) ^ (((x >> 7) & 1) * 0x1B)).astype(np.uint8)
+
+        s0, s1, s2, s3 = st[:, 0], st[:, 1], st[:, 2], st[:, 3]
+        tmp = s0 ^ s1 ^ s2 ^ s3                 # common term
+
+        t0 = xtime(s0 ^ s1) ^ tmp ^ s0
+        t1 = xtime(s1 ^ s2) ^ tmp ^ s1
+        t2 = xtime(s2 ^ s3) ^ tmp ^ s2
+        t3 = xtime(s3 ^ s0) ^ tmp ^ s3
+
+        mixed = np.stack([t0, t1, t2, t3], axis=1).astype(np.uint8)
+        return mixed
+        
+    numpy_result = mix_columns_numpy(int_2d_array)
+    
+    
+    # hi/lo nibble로 분할
+    alpha_int, beta_int = split_to_nibbles(int_array)
 
     # Map to zeta domain
     alpha = int_to_zeta(alpha_int)
@@ -167,9 +194,18 @@ if __name__ == "__main__":
     start_time = time.time()
     # 3. Decrypt result
     decoded_zeta = engine.decrypt(mixed_ct_hi, secret_key)
-    decoded_int = zeta_to_int(decoded_zeta)
+    decoded_int_hi = zeta_to_int(decoded_zeta)
     decoded_zeta_lo = engine.decrypt(mixed_ct_lo, secret_key)
     decoded_int_lo = zeta_to_int(decoded_zeta_lo)
     
-    print(decoded_int)
+    print(decoded_int_hi)
     print(decoded_int_lo)
+    
+    print(numpy_result[0, :, :])
+
+    decoded_int = decoded_int_hi << 4 | decoded_int_lo
+    
+    print(decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048])
+    
+    decoded_int_first_block = np.array([decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048]])
+    print(numpy_result[0, :, :] == decoded_int_first_block)
