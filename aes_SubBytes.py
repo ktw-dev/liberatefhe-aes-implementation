@@ -213,3 +213,75 @@ if __name__ == "__main__":
             out_byte = int(output_bytes[idx])
             print(f"  idx {idx}: input 0x{in_byte:02X} -> expected 0x{exp_byte:02X}, got 0x{out_byte:02X}")
         raise AssertionError("SubBytes result does not match reference implementation.")
+    
+    
+if __name__ == "__main__":
+    from aes_transform_zeta import int_to_zeta, zeta_to_int
+    from aes_split_to_nibble import split_to_nibbles
+    from aes_shift_rows import shift_rows  # 검증 대상
+    import numpy as np
+    import time
+
+    # CKKS 엔진 초기화
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
+    engine = engine_context.engine
+    public_key = engine_context.public_key
+    secret_key = engine_context.secret_key
+
+    print("engine init")
+
+    # 1. 테스트 입력 준비
+    np.random.seed(42)
+    # AES state 16바이트 패턴을 여러 블록에 반복
+    # 한 블록 = [0,1,...,15], 여러 블록으로 채움
+    single_block = np.arange(16, dtype=np.uint8)
+    num_blocks = 32768 // 16
+    int_array = np.tile(single_block, num_blocks)
+
+    # hi/lo nibble로 분할
+    alpha_int, beta_int = split_to_nibbles(int_array)
+
+    # zeta domain 매핑
+    alpha = int_to_zeta(alpha_int)
+    beta  = int_to_zeta(beta_int)
+
+    # 암호화
+    enc_alpha = engine.encrypt(alpha, public_key, level=10)
+    enc_beta  = engine.encrypt(beta, public_key, level=10)
+
+    # 2. ShiftRows 실행
+    start_time = time.time()
+    shifted_hi_ct = shift_rows(engine_context, enc_alpha, enc_beta)  # 현재 shift_rows가 hi만 처리하도록 되어 있음
+    end_time = time.time()
+    print(f"ShiftRows time taken: {end_time - start_time} seconds")
+
+    # 3. 복호화
+    decoded_zeta_hi = engine.decrypt(shifted_hi_ct, secret_key)
+    decoded_int_hi = zeta_to_int(decoded_zeta_hi)
+
+    # 4. NumPy 참값 계산 (column-major 레이아웃 가정)
+    def numpy_shift_rows_column_major(state_bytes: np.ndarray) -> np.ndarray:
+        # state_bytes: flat 배열, 여러 블록 존재
+        reshaped = state_bytes.reshape(-1, 4, 4, order='F')  # column-major 해석
+        # ShiftRows 수행
+        for block in reshaped:
+            block[1] = np.roll(block[1], -1)  # Row1 left shift by 1
+            block[2] = np.roll(block[2], -2)  # Row2 left shift by 2
+            block[3] = np.roll(block[3], -3)  # Row3 left shift by 3
+        return reshaped.reshape(-1, order='F')
+
+    expected_bytes = numpy_shift_rows_column_major(int_array)
+
+    # 5. 비교
+    if np.array_equal(decoded_int_hi, expected_bytes):
+        print("✅  ShiftRows output matches NumPy reference for all samples!")
+    else:
+        mismatches = np.sum(decoded_int_hi != expected_bytes)
+        print(f"❌  ShiftRows mismatch in {mismatches} out of {decoded_int_hi.size} samples.")
+        mismatch_idx = np.where(decoded_int_hi != expected_bytes)[0][:10]
+        for idx in mismatch_idx:
+            in_val = int(int_array[idx])
+            exp_val = int(expected_bytes[idx])
+            out_val = int(decoded_int_hi[idx])
+            print(f"  idx {idx}: input 0x{in_val:02X} -> expected 0x{exp_val:02X}, got 0x{out_val:02X}")
+        raise AssertionError("ShiftRows result does not match reference implementation.")

@@ -1,4 +1,4 @@
-"""aes-ShiftRows.py
+`"""aes-ShiftRows.py
 
 ShiftRows operation for AES-128 ECB mode with FHE compatibility.
 
@@ -134,8 +134,28 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     # rotate operation
     # -----------------------------------------------------------------------------
+    # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
+    # mask_row_1에 대해 0은 3 로 한번, 123은 -1로 한 번 회전
+    rotated_row_1_0 = engine.rotate(masked_row_1_0, fixed_rotation_key_list[5])
+    rotated_row_1_123 = engine.rotate(masked_row_1_123, fixed_rotation_key_list[2])
+    
+    # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
+    rotated_row_2_01 = engine.rotate(masked_row_2_01, fixed_rotation_key_list[4])
+    rotated_row_2_23 = engine.rotate(masked_row_2_23, fixed_rotation_key_list[1])
+    
+    # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
+    rotated_row_3_012 = engine.rotate(masked_row_3_012, fixed_rotation_key_list[3])
+    rotated_row_3_3 = engine.rotate(masked_row_3_3, fixed_rotation_key_list[0])
+    
+    # concatenate all the rotated rows
+    rotated_rows_0 = engine.add(masked_row_0, rotated_row_1_0)
+    rotated_rows_1 = engine.add(rotated_rows_0, rotated_row_1_123)
+    rotated_rows_2 = engine.add(rotated_rows_1, rotated_row_2_01)
+    rotated_rows_3 = engine.add(rotated_rows_2, rotated_row_2_23)
+    rotated_rows_4 = engine.add(rotated_rows_3, rotated_row_3_012)
+    rotated_rows = engine.add(rotated_rows_4, rotated_row_3_3)
 
-    return None
+    return rotated_rows
 
 def inverse_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     """
