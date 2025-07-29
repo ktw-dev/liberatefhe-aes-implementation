@@ -16,6 +16,9 @@ Layout reminder:
 - Each b_i segment has max_blocks elements
 - Within each block: bytes 0,1,2,3 = row 0; bytes 4,5,6,7 = row 1; etc.
 """
+# -----------------------------------------------------------------------------
+# ShiftRows helpers
+# -----------------------------------------------------------------------------
 from __future__ import annotations
 
 import numpy as np
@@ -23,6 +26,62 @@ import numpy as np
 __all__ = [
     "shift_rows",
 ]
+
+
+# -----------------------------------------------------------------------------
+# Mask plaintext cache
+# -----------------------------------------------------------------------------
+
+def _get_shift_rows_masks(engine_context: "CKKS_EngineContext"):
+    """Return plaintext masks for (inverse) ShiftRows.
+
+    The expensive numpy-concatenate & engine.encode operations are executed **once
+    per CKKS_EngineContext** and the resulting Plaintext objects are cached on
+    the context instance (attribute ``_shift_rows_masks``). Subsequent calls
+    simply reuse the cached values.
+    """
+
+    # Fast-path: masks already cached on this context --------------------------------
+    if hasattr(engine_context, "_shift_rows_masks"):
+        return engine_context._shift_rows_masks  # type: ignore[attr-defined]
+
+    engine = engine_context.engine
+    max_blocks = 2048  # number of AES blocks packed in one ciphertext
+
+    # ---------------------------- build boolean masks ------------------------------
+    row_0_mask = np.concatenate((np.ones(4 * max_blocks), np.zeros(12 * max_blocks)))
+
+    row_1_0_mask = np.concatenate(
+        (np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks))
+    )
+    row_2_01_mask = np.concatenate(
+        (np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks))
+    )
+    row_3_012_mask = np.concatenate((np.zeros(12 * max_blocks), np.ones(4 * max_blocks)))
+
+    row_1_123_mask = np.concatenate(
+        (np.zeros(5 * max_blocks), np.ones(3 * max_blocks), np.zeros(8 * max_blocks))
+    )
+    row_2_23_mask = np.concatenate(
+        (np.zeros(10 * max_blocks), np.ones(2 * max_blocks), np.zeros(4 * max_blocks))
+    )
+    row_3_3_mask = np.concatenate((np.zeros(15 * max_blocks), np.ones(1 * max_blocks)))
+
+    # ---------------------------- encode and cache ----------------------------------
+    masks = {
+        "row_0": engine.encode(row_0_mask),
+        "row_1_0": engine.encode(row_1_0_mask),
+        "row_2_01": engine.encode(row_2_01_mask),
+        "row_3_012": engine.encode(row_3_012_mask),
+        "row_1_123": engine.encode(row_1_123_mask),
+        "row_2_23": engine.encode(row_2_23_mask),
+        "row_3_3": engine.encode(row_3_3_mask),
+    }
+
+    # Persist on context for future reuse
+    engine_context._shift_rows_masks = masks  # type: ignore[attr-defined]
+    return masks
+
 
 def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     """
@@ -45,29 +104,18 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -3 -2 -1 1 2 3
     
     # -----------------------------------------------------------------------------
-    # masking_plaintext 생성
+    # Load / cache plaintext masks -------------------------------------------------
     # -----------------------------------------------------------------------------
-    row_0_mask = np.concatenate((np.ones(4 * 2048), np.zeros(12 * 2048)))
-    row_1_0_mask = np.concatenate((np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)))
-    row_2_01_mask = np.concatenate((np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)))
-    row_3_012_mask = np.concatenate((np.zeros(12 * 2048), np.ones(4 * 2048)))
-    
-    row_1_123_mask = np.concatenate((np.zeros(5 * 2048), np.ones(3 * 2048), np.zeros(8 * 2048)))
-    row_2_23_mask = np.concatenate((np.zeros(10 * 2048), np.ones(2 * 2048), np.zeros(4 * 2048)))
-    row_3_3_mask = np.concatenate((np.zeros(15 * 2048), np.ones(1 * 2048)))
-    
-    
-    # -----------------------------------------------------------------------------
-    # encode masking_plaintext
-    # -----------------------------------------------------------------------------
-    row_0_mask_plaintext = engine.encode(row_0_mask)
-    row_1_0_mask_plaintext = engine.encode(row_1_0_mask)
-    row_2_01_mask_plaintext = engine.encode(row_2_01_mask)
-    row_3_012_mask_plaintext = engine.encode(row_3_012_mask)
-    
-    row_1_123_mask_plaintext = engine.encode(row_1_123_mask)
-    row_2_23_mask_plaintext = engine.encode(row_2_23_mask)
-    row_3_3_mask_plaintext = engine.encode(row_3_3_mask)
+    _masks = _get_shift_rows_masks(engine_context)
+
+    row_0_mask_plaintext = _masks["row_0"]
+    row_1_0_mask_plaintext = _masks["row_1_0"]
+    row_2_01_mask_plaintext = _masks["row_2_01"]
+    row_3_012_mask_plaintext = _masks["row_3_012"]
+
+    row_1_123_mask_plaintext = _masks["row_1_123"]
+    row_2_23_mask_plaintext = _masks["row_2_23"]
+    row_3_3_mask_plaintext = _masks["row_3_3"]
     
     # -----------------------------------------------------------------------------
     # masking operation
