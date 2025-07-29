@@ -130,6 +130,9 @@ class CKKS_EngineContext:
         if use_bootstrap  and signature == 1:
             self.small_bootstrap_key = self.engine.create_small_bootstrap_key(self.secret_key)
             self.bootstrap_key = self.engine.create_bootstrap_key(self.secret_key)
+        
+        # ShiftRows masks
+        self._shift_rows_masks: dict[str, "desilofhe.Plaintext"] | None = None
 
     # ---------------------------------------------------------------------
     # Representation helpers

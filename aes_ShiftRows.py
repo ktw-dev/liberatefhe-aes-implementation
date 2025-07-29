@@ -79,10 +79,31 @@ def _get_shift_rows_masks(engine_context: "CKKS_EngineContext"):
         "row_1_123": engine.encode(row_1_123_mask),
         "row_2_23": engine.encode(row_2_23_mask),
         "row_3_3": engine.encode(row_3_3_mask),
+        # ---------------- Inverse ShiftRows masks -----------------
+        # naming convention: rows_<rowIndex>_<segment description>
+        #   rows_0               : entire row 0 (no rotation)
+        #   rows_1_012 / rows_1_3: row-1 split before inverse rotation (bytes 4-6 vs 7)
+        #   rows_2_01  / rows_2_23: row-2 split (bytes 8,9 vs 10,11)
+        #   rows_3_0   / rows_3_123: row-3 split (byte 12 vs 13-15)
+        # "rows_0": engine.encode(row_0_mask),
+        "rows_1_012": engine.encode(
+            np.concatenate((np.zeros(4 * max_blocks), np.ones(3 * max_blocks), np.zeros(9 * max_blocks)))
+        ),
+        "rows_1_3": engine.encode(
+            np.concatenate((np.zeros(7 * max_blocks), np.ones(1 * max_blocks), np.zeros(8 * max_blocks)))
+        ),
+        # "rows_2_01": engine.encode(row_2_01_mask),  # same as forward
+        # "rows_2_23": engine.encode(row_2_23_mask),  # same as forward
+        "rows_3_0": engine.encode(
+            np.concatenate((np.zeros(12 * max_blocks), np.ones(1 * max_blocks), np.zeros(3 * max_blocks)))
+        ),
+        "rows_3_123": engine.encode(
+            np.concatenate((np.zeros(13 * max_blocks), np.ones(3 * max_blocks)))
+        ),
     }
 
     # Persist on context for future reuse
-    engine_context._shift_rows_masks = masks  # type: ignore[attr-defined]
+    engine_context._shift_rows_masks = masks
     return masks
 
 
