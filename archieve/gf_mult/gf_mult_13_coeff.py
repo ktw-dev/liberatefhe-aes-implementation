@@ -23,10 +23,8 @@ import json
 import numpy as np
 from pathlib import Path
 import sys
-from gf_mult_table import gf_mult_3
-# -----------------------------------------------------------------------------
-# locate aes_MixColumns to import GF_MULT_2 table
-# -----------------------------------------------------------------------------
+from gf_mult_table import gf_mult_13
+
 THIS_DIR = Path(__file__).resolve().parent
 
 ZETA = np.exp(-2j * np.pi / 16)
@@ -41,7 +39,7 @@ def _build_tables():
     for a in range(16):
         for b in range(16):
             x = (a << 4) | b
-            y = int(gf_mult_3[x])
+            y = int(gf_mult_13[x])
             y_hi = (y >> 4) & 0xF
             y_lo = y & 0xF
             f_hi[a, b] = ZETA ** y_hi
@@ -75,7 +73,7 @@ def main():
             "entries": entries,
             "note": f"monomial coefficients for GF×2 {name} nibble via ifft2"
         }
-        out_path = THIS_DIR / f"gf_mult3_{name}_coeffs.json"
+        out_path = THIS_DIR / f"gf_mult13_{name}_coeffs.json"
         out_path.write_text(json.dumps(obj, indent=2))
         print(f"[INFO] Saved {out_path.name}  (non-zero={len(entries)}/{16*16})")
 
