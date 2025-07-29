@@ -119,44 +119,84 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     row_3_3_mask_plaintext = _masks["row_3_3"]
     
     # -----------------------------------------------------------------------------
-    # masking operation
+    # masking operation of High nibble
     # -----------------------------------------------------------------------------
-    masked_row_0 = engine.multiply(ct_hi, row_0_mask_plaintext)
+    masked_row_hi_0 = engine.multiply(ct_hi, row_0_mask_plaintext)
     
-    masked_row_1_0 = engine.multiply(ct_hi, row_1_0_mask_plaintext)
-    masked_row_1_123 = engine.multiply(ct_hi, row_1_123_mask_plaintext)
+    masked_row_hi_1_0 = engine.multiply(ct_hi, row_1_0_mask_plaintext)
+    masked_row_hi_1_123 = engine.multiply(ct_hi, row_1_123_mask_plaintext)
     
-    masked_row_2_01 = engine.multiply(ct_hi, row_2_01_mask_plaintext)
-    masked_row_2_23 = engine.multiply(ct_hi, row_2_23_mask_plaintext)
+    masked_row_hi_2_01 = engine.multiply(ct_hi, row_2_01_mask_plaintext)
+    masked_row_hi_2_23 = engine.multiply(ct_hi, row_2_23_mask_plaintext)
     
-    masked_row_3_012 = engine.multiply(ct_hi, row_3_012_mask_plaintext)
-    masked_row_3_3 = engine.multiply(ct_hi, row_3_3_mask_plaintext)
+    masked_row_hi_3_012 = engine.multiply(ct_hi, row_3_012_mask_plaintext)
+    masked_row_hi_3_3 = engine.multiply(ct_hi, row_3_3_mask_plaintext)
     
     # -----------------------------------------------------------------------------
-    # rotate operation
+    # masking operation of Low nibble
+    # -----------------------------------------------------------------------------
+    masked_row_lo_0 = engine.multiply(ct_lo, row_0_mask_plaintext)
+    
+    masked_row_lo_1_0 = engine.multiply(ct_lo, row_1_0_mask_plaintext)
+    masked_row_lo_1_123 = engine.multiply(ct_lo, row_1_123_mask_plaintext)
+    
+    masked_row_lo_2_01 = engine.multiply(ct_lo, row_2_01_mask_plaintext)
+    masked_row_lo_2_23 = engine.multiply(ct_lo, row_2_23_mask_plaintext)
+    
+    masked_row_lo_3_012 = engine.multiply(ct_lo, row_3_012_mask_plaintext)
+    masked_row_lo_3_3 = engine.multiply(ct_lo, row_3_3_mask_plaintext)
+    
+    # -----------------------------------------------------------------------------
+    # rotate operation of High nibble
     # -----------------------------------------------------------------------------
     # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
     # mask_row_1에 대해 0은 3 로 한번, 123은 -1로 한 번 회전
-    rotated_row_1_0 = engine.rotate(masked_row_1_0, fixed_rotation_key_list[5])
-    rotated_row_1_123 = engine.rotate(masked_row_1_123, fixed_rotation_key_list[2])
+    rotated_row_hi_1_0 = engine.rotate(masked_row_hi_1_0, fixed_rotation_key_list[5])
+    rotated_row_hi_1_123 = engine.rotate(masked_row_hi_1_123, fixed_rotation_key_list[2])
     
     # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
-    rotated_row_2_01 = engine.rotate(masked_row_2_01, fixed_rotation_key_list[4])
-    rotated_row_2_23 = engine.rotate(masked_row_2_23, fixed_rotation_key_list[1])
+    rotated_row_hi_2_01 = engine.rotate(masked_row_hi_2_01, fixed_rotation_key_list[4])
+    rotated_row_hi_2_23 = engine.rotate(masked_row_hi_2_23, fixed_rotation_key_list[1])
     
     # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
-    rotated_row_3_012 = engine.rotate(masked_row_3_012, fixed_rotation_key_list[3])
-    rotated_row_3_3 = engine.rotate(masked_row_3_3, fixed_rotation_key_list[0])
+    rotated_row_hi_3_012 = engine.rotate(masked_row_hi_3_012, fixed_rotation_key_list[3])
+    rotated_row_hi_3_3 = engine.rotate(masked_row_hi_3_3, fixed_rotation_key_list[0])
     
     # concatenate all the rotated rows
-    rotated_rows_0 = engine.add(masked_row_0, rotated_row_1_0)
-    rotated_rows_1 = engine.add(rotated_rows_0, rotated_row_1_123)
-    rotated_rows_2 = engine.add(rotated_rows_1, rotated_row_2_01)
-    rotated_rows_3 = engine.add(rotated_rows_2, rotated_row_2_23)
-    rotated_rows_4 = engine.add(rotated_rows_3, rotated_row_3_012)
-    rotated_rows = engine.add(rotated_rows_4, rotated_row_3_3)
+    rotated_rows_hi_0 = engine.add(masked_row_hi_0, rotated_row_hi_1_0)
+    rotated_rows_hi_1 = engine.add(rotated_rows_hi_0, rotated_row_hi_1_123)
+    rotated_rows_hi_2 = engine.add(rotated_rows_hi_1, rotated_row_hi_2_01)
+    rotated_rows_hi_3 = engine.add(rotated_rows_hi_2, rotated_row_hi_2_23)
+    rotated_rows_hi_4 = engine.add(rotated_rows_hi_3, rotated_row_hi_3_012)
+    rotated_rows_hi = engine.add(rotated_rows_hi_4, rotated_row_hi_3_3)
+    
+    # -----------------------------------------------------------------------------
+    # rotate operation of Low nibble
+    # -----------------------------------------------------------------------------
+    # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
+    # mask_row_1에 대해 0은 3 로 한번, 123은 -1로 한 번 회전
+    rotated_row_lo_1_0 = engine.rotate(masked_row_lo_1_0, fixed_rotation_key_list[5])
+    rotated_row_lo_1_123 = engine.rotate(masked_row_lo_1_123, fixed_rotation_key_list[2])
+    
+    # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
+    rotated_row_lo_2_01 = engine.rotate(masked_row_lo_2_01, fixed_rotation_key_list[4])
+    rotated_row_lo_2_23 = engine.rotate(masked_row_lo_2_23, fixed_rotation_key_list[1])
+    
+    # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
+    rotated_row_lo_3_012 = engine.rotate(masked_row_lo_3_012, fixed_rotation_key_list[3])
+    rotated_row_lo_3_3 = engine.rotate(masked_row_lo_3_3, fixed_rotation_key_list[0])
+    
+    # concatenate all the rotated rows
+    rotated_rows_lo_0 = engine.add(masked_row_lo_0, rotated_row_lo_1_0)
+    rotated_rows_lo_1 = engine.add(rotated_rows_lo_0, rotated_row_lo_1_123)
+    rotated_rows_lo_2 = engine.add(rotated_rows_lo_1, rotated_row_lo_2_01)
+    rotated_rows_lo_3 = engine.add(rotated_rows_lo_2, rotated_row_lo_2_23)
+    rotated_rows_lo_4 = engine.add(rotated_rows_lo_3, rotated_row_lo_3_012)
+    rotated_rows_lo = engine.add(rotated_rows_lo_4, rotated_row_lo_3_3)
+    
 
-    return rotated_rows
+
+    return rotated_rows_hi, rotated_rows_lo
 
 def inverse_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     """
@@ -164,10 +204,11 @@ def inverse_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     """
     pass
 
+
+
 if __name__ == "__main__":
     from aes_transform_zeta import int_to_zeta, zeta_to_int
     from aes_split_to_nibble import split_to_nibbles
-
     import numpy as np
     import time
 
@@ -199,38 +240,48 @@ if __name__ == "__main__":
     enc_beta  = engine.encrypt(beta, public_key, level=10)
 
     # 2. ShiftRows 실행
+    print("ShiftRows 실행")
+    print(f"before shiftrows.level: hi={enc_alpha.level}, lo={enc_beta.level}")
     start_time = time.time()
-    shifted_hi_ct = shift_rows(engine_context, enc_alpha, enc_beta)  # 현재 shift_rows가 hi만 처리하도록 되어 있음
+    shifted_hi_ct, shifted_lo_ct = shift_rows(engine_context, enc_alpha, enc_beta)
     end_time = time.time()
     print(f"ShiftRows time taken: {end_time - start_time} seconds")
+    print(f"after shiftrows.level: hi={shifted_hi_ct.level}, lo={shifted_lo_ct.level}")
 
-    # 3. 복호화
+    # 3. 복호화 (hi/lo 둘 다)
     decoded_zeta_hi = engine.decrypt(shifted_hi_ct, secret_key)
     decoded_int_hi = zeta_to_int(decoded_zeta_hi)
+
+    decoded_zeta_lo = engine.decrypt(shifted_lo_ct, secret_key)
+    decoded_int_lo = zeta_to_int(decoded_zeta_lo)
+
+    # 최종 바이트 결합
+    decoded_bytes = ((decoded_int_hi.astype(np.uint8) << 4) |
+                     decoded_int_lo.astype(np.uint8))
 
     # 4. NumPy 참값 계산 (column-major 레이아웃 가정)
     def numpy_shift_rows_column_major(state_bytes: np.ndarray) -> np.ndarray:
         # state_bytes: flat 배열, 여러 블록 존재
-        reshaped = state_bytes.reshape(-1, 4, 4)  # column-major 해석
+        reshaped = state_bytes.reshape(-1, 4, 4, order="F")  # column-major 해석
         # ShiftRows 수행
         for block in reshaped:
             block[1] = np.roll(block[1], -1)  # Row1 left shift by 1
             block[2] = np.roll(block[2], -2)  # Row2 left shift by 2
             block[3] = np.roll(block[3], -3)  # Row3 left shift by 3
-        return reshaped.reshape(-1)
+        return reshaped.reshape(-1, order="F")
 
     expected_bytes = numpy_shift_rows_column_major(int_array)
 
     # 5. 비교
-    if np.array_equal(decoded_int_hi, expected_bytes):
+    if np.array_equal(decoded_bytes, expected_bytes):
         print("✅  ShiftRows output matches NumPy reference for all samples!")
     else:
-        mismatches = np.sum(decoded_int_hi != expected_bytes)
-        print(f"❌  ShiftRows mismatch in {mismatches} out of {decoded_int_hi.size} samples.")
-        mismatch_idx = np.where(decoded_int_hi != expected_bytes)[0][:10]
+        mismatches = np.sum(decoded_bytes != expected_bytes)
+        print(f"❌  ShiftRows mismatch in {mismatches} out of {decoded_bytes.size} samples.")
+        mismatch_idx = np.where(decoded_bytes != expected_bytes)[0][:10]
         for idx in mismatch_idx:
             in_val = int(int_array[idx])
             exp_val = int(expected_bytes[idx])
-            out_val = int(decoded_int_hi[idx])
+            out_val = int(decoded_bytes[idx])
             print(f"  idx {idx}: input 0x{in_val:02X} -> expected 0x{exp_val:02X}, got 0x{out_val:02X}")
         raise AssertionError("ShiftRows result does not match reference implementation.")
