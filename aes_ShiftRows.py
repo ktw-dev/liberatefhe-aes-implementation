@@ -1,4 +1,4 @@
-`"""aes-ShiftRows.py
+"""aes-ShiftRows.py
 
 ShiftRows operation for AES-128 ECB mode with FHE compatibility.
 
@@ -52,13 +52,15 @@ def _get_shift_rows_masks(engine_context: "CKKS_EngineContext"):
     # ---------------------------- build boolean masks ------------------------------
     row_0_mask = np.concatenate((np.ones(4 * max_blocks), np.zeros(12 * max_blocks)))
 
+    # row 1 is split into 1+3 bytes -> segments 4 and 5,6,7
     row_1_0_mask = np.concatenate(
-        (np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks))
+        (np.zeros(4 * max_blocks), np.ones(1 * max_blocks), np.zeros(11 * max_blocks))
     )
+    # row 2 is split into 2+2 bytes -> segments 8,9 and 10,11
     row_2_01_mask = np.concatenate(
-        (np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks))
+        (np.zeros(8 * max_blocks), np.ones(2 * max_blocks), np.zeros(6 * max_blocks))
     )
-    row_3_012_mask = np.concatenate((np.zeros(12 * max_blocks), np.ones(4 * max_blocks)))
+    row_3_012_mask = np.concatenate((np.zeros(12 * max_blocks), np.ones(3 * max_blocks), np.zeros(1 * max_blocks)))
 
     row_1_123_mask = np.concatenate(
         (np.zeros(5 * max_blocks), np.ones(3 * max_blocks), np.zeros(8 * max_blocks))
@@ -103,6 +105,7 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     fixed_rotation_key_list = [engine_context.get_fixed_rotation_key(i * 2048) for i in range(-3, 4) if i != 0]
     # -3 -2 -1 1 2 3
+    print(fixed_rotation_key_list)
     
     # -----------------------------------------------------------------------------
     # Load / cache plaintext masks -------------------------------------------------
@@ -174,7 +177,7 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # rotate operation of Low nibble
     # -----------------------------------------------------------------------------
     # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
-    # mask_row_1에 대해 0은 3 로 한번, 123은 -1로 한 번 회전
+    # mask_row_1에 대해 0은 3로 한번, 123은 -1로 한 번 회전
     rotated_row_lo_1_0 = engine.rotate(masked_row_lo_1_0, fixed_rotation_key_list[5])
     rotated_row_lo_1_123 = engine.rotate(masked_row_lo_1_123, fixed_rotation_key_list[2])
     
@@ -220,13 +223,15 @@ if __name__ == "__main__":
 
     print("engine init")
 
-    # 0~15 값을 각각 2048번 반복
-    slots_per_value = 2048
-    single_values = np.arange(16, dtype=np.uint8)
-    int_array = np.repeat(single_values, slots_per_value)
+    slots_per_block = 2048
+    num_blocks = 16
 
-    print(int_array.shape)  # (32768,)
-    print(int_array[:10])   # 0,0,0,...,1,1,1,...
+    # 0~15 값을 각각 2048번 반복해서 붙이기
+    int_array = np.repeat(np.arange(num_blocks, dtype=np.uint8), slots_per_block)
+
+    print(int_array.shape)   # (32768,)
+    print(int_array[:6])
+    print(int_array[2040:2055])  # 경계 확인: 앞은 0, 뒤는 1로 바뀜
 
     # hi/lo nibble로 분할
     alpha_int, beta_int = split_to_nibbles(int_array)
@@ -259,29 +264,34 @@ if __name__ == "__main__":
     decoded_bytes = ((decoded_int_hi.astype(np.uint8) << 4) |
                      decoded_int_lo.astype(np.uint8))
 
-    # 4. NumPy 참값 계산 (column-major 레이아웃 가정)
-    def numpy_shift_rows_column_major(state_bytes: np.ndarray) -> np.ndarray:
-        # state_bytes: flat 배열, 여러 블록 존재
-        reshaped = state_bytes.reshape(-1, 4, 4, order="F")  # column-major 해석
-        # ShiftRows 수행
-        for block in reshaped:
-            block[1] = np.roll(block[1], -1)  # Row1 left shift by 1
-            block[2] = np.roll(block[2], -2)  # Row2 left shift by 2
-            block[3] = np.roll(block[3], -3)  # Row3 left shift by 3
-        return reshaped.reshape(-1, order="F")
+    # 5. 비교 (row-major 블록 매핑 기반)
+    slots_per_block = 2048
+    rows = [
+        [0, 1, 2, 3],     # Row 0
+        [4, 5, 6, 7],     # Row 1
+        [8, 9, 10, 11],   # Row 2
+        [12, 13, 14, 15]  # Row 3
+    ]
 
-    expected_bytes = numpy_shift_rows_column_major(int_array)
+    # ShiftRows 회전
+    rows[1] = np.roll(rows[1], -1)  # Row1 left shift by 1
+    rows[2] = np.roll(rows[2], -2)  # Row2 left shift by 2
+    rows[3] = np.roll(rows[3], -3)  # Row3 left shift by 3
 
-    # 5. 비교
-    if np.array_equal(decoded_bytes, expected_bytes):
-        print("✅  ShiftRows output matches NumPy reference for all samples!")
+    # 최종 블록 순서
+    expected_block_order = [b for row in rows for b in row]
+
+    # 블록 단위 비교
+    mismatches = 0
+    for block_idx, expected_val in enumerate(expected_block_order):
+        start = block_idx * slots_per_block
+        end = start + slots_per_block
+        block_values = decoded_bytes[start:end]
+        if not np.all(block_values == expected_val):
+            mismatches += 1
+            print(f"❌ Block {block_idx}: expected {expected_val}, got unique values {np.unique(block_values)}")
+
+    if mismatches == 0:
+        print("✅ ShiftRows output matches block mapping for all blocks!")
     else:
-        mismatches = np.sum(decoded_bytes != expected_bytes)
-        print(f"❌  ShiftRows mismatch in {mismatches} out of {decoded_bytes.size} samples.")
-        mismatch_idx = np.where(decoded_bytes != expected_bytes)[0][:10]
-        for idx in mismatch_idx:
-            in_val = int(int_array[idx])
-            exp_val = int(expected_bytes[idx])
-            out_val = int(decoded_bytes[idx])
-            print(f"  idx {idx}: input 0x{in_val:02X} -> expected 0x{exp_val:02X}, got 0x{out_val:02X}")
-        raise AssertionError("ShiftRows result does not match reference implementation.")
+        raise AssertionError(f"ShiftRows block mismatch in {mismatches} out of {len(expected_block_order)} blocks.")
