@@ -342,7 +342,7 @@ if __name__ == "__main__":
     beta_int_16 = beta_int[:16]
     
     # 1-1. gf_mult_2 of alpha << 4 | beta int
-    alpha_beta_int = (alpha_int_16 << 4) | beta_int_16
+    alpha_beta_int = (alpha_int << 4) | beta_int
     alpha_beta_int_gf_mult_2 = gf_mult_lookup(alpha_beta_int, 2)
     
     # 1-2. gf_mult_3 of alpha << 4 | beta int
@@ -359,63 +359,87 @@ if __name__ == "__main__":
     enc_alpha_int_zeta = engine.encrypt(alpha_int_zeta, public_key, level=10)
     enc_beta_int_zeta = engine.encrypt(beta_int_zeta, public_key, level=10)
     
-    # start_time = time.time()
-    # print("start gf_mul_2.level", enc_alpha_int_zeta.level)
-    # ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
-    # print("after gf_mul_2.level", ct_hi.level)
-    # end_time = time.time()
-    # print(f"gf_mul_2 time: {end_time - start_time} seconds")
-    
-    ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
-    ct_hi, ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)
-    print("after gf_mul_2.level", ct_hi.level)
-    
-    bootstrapped_ct_hi_3 = engine.bootstrap(ct_hi, relinearization_key, conjugation_key, bootstrap_key)
-    bootstrapped_ct_lo_3 = engine.bootstrap(ct_lo, relinearization_key, conjugation_key, bootstrap_key)
-    
-    print("booted doublegf_mul_2.level", bootstrapped_ct_hi_3.level)
+    # gf mult 2,3,9,11,13,14 table 연산
+    alpha_beta_int_gf_mult_2 = gf_mult_lookup(alpha_beta_int, 2)
+    alpha_beta_int_gf_mult_3 = gf_mult_lookup(alpha_beta_int, 3)
+    alpha_beta_int_gf_mult_9 = gf_mult_lookup(alpha_beta_int, 9)
+    alpha_beta_int_gf_mult_11 = gf_mult_lookup(alpha_beta_int, 11)
+    alpha_beta_int_gf_mult_13 = gf_mult_lookup(alpha_beta_int, 13)
+    alpha_beta_int_gf_mult_14 = gf_mult_lookup(alpha_beta_int, 14)
 
+    print(f"alpha_beta_int_gf_mult_2[:16]: {alpha_beta_int_gf_mult_2[:16]}")
+    print(f"alpha_beta_int_gf_mult_3[:16]: {alpha_beta_int_gf_mult_3[:16]}")
+    print(f"alpha_beta_int_gf_mult_9[:16]: {alpha_beta_int_gf_mult_9[:16]}")
+    print(f"alpha_beta_int_gf_mult_11[:16]: {alpha_beta_int_gf_mult_11[:16]}")
+    print(f"alpha_beta_int_gf_mult_13[:16]: {alpha_beta_int_gf_mult_13[:16]}")
+    print(f"alpha_beta_int_gf_mult_14[:16]: {alpha_beta_int_gf_mult_14[:16]}")
     
-    
+    # gf mult 2,3,9,11,13,14의 다항식 연산 및 각각의 시간 측정
     start_time = time.time()
-    print("start gf_mul_3.level", enc_alpha_int_zeta.level)
-    
-    ct_hi, ct_lo = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
-    
-    print("right after gf_mul_2.level", ct_hi.level)
-    
-    ct_hi_3 = _xor_operation(engine_context, ct_hi, enc_alpha_int_zeta)
-    bootstrapped_ct_hi_3 = engine.bootstrap(ct_hi_3, relinearization_key, conjugation_key, bootstrap_key)
-    
-    ct_lo_3 = _xor_operation(engine_context, ct_lo, enc_beta_int_zeta)
-    bootstrapped_ct_lo_3 = engine.bootstrap(ct_lo_3, relinearization_key, conjugation_key, bootstrap_key)
-    
-    print("booted gf_mul_3.level", bootstrapped_ct_hi_3.level)
-    
+    gf_mul_2_alpha, gf_mul_2_beta = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
-    
-    print(f"gf_mul_3 time: {end_time - start_time} seconds")
+    print(f"gf_mul_2 작동 시간: {end_time - start_time}초")
+    print(f"gf mult 2 작동 후 level: {gf_mul_2_alpha.level}")
     
     start_time = time.time()
+    gf_mul_3_alpha, gf_mul_3_beta = gf_mul_3(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    end_time = time.time()
+    print(f"gf_mul_3 작동 시간: {end_time - start_time}초")
+    print(f"gf mult 3 작동 후 level: {gf_mul_3_alpha.level}")
     
-    dec_ct_hi = engine.decrypt(ct_hi, secret_key)
-    dec_ct_lo = engine.decrypt(ct_lo, secret_key)
+    start_time = time.time()
+    gf_mul_9_alpha, gf_mul_9_beta = gf_mul_9(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    end_time = time.time()
+    print(f"gf_mul_9 작동 시간: {end_time - start_time}초")
+    print(f"gf mult 9 작동 후 level: {gf_mul_9_alpha.level}")   
+    start_time = time.time()
+    gf_mul_11_alpha, gf_mul_11_beta = gf_mul_11(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    end_time = time.time()
+    print(f"gf_mul_11 작동 시간: {end_time - start_time}초")
+    print(f"gf mult 11 작동 후 level: {gf_mul_11_alpha.level}")
+    start_time = time.time()
+    gf_mul_13_alpha, gf_mul_13_beta = gf_mul_13(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    end_time = time.time()
+    print(f"gf_mul_13 작동 시간: {end_time - start_time}초")
+    print(f"gf mult 13 작동 후 level: {gf_mul_13_alpha.level}")
+    start_time = time.time()
+    gf_mul_14_alpha, gf_mul_14_beta = gf_mul_14(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    end_time = time.time()
+    print(f"gf_mul_14 작동 시간: {end_time - start_time}초")
+    print(f"gf mult 14 작동 후 level: {gf_mul_14_alpha.level}")
     
-    dec_ct_hi_3 = engine.decrypt(ct_hi_3, secret_key)
-    dec_ct_lo_3 = engine.decrypt(ct_lo_3, secret_key)
+    # decrypt
+    dec_gf_mul_2_alpha = engine.decrypt(gf_mul_2_alpha, secret_key)
+    dec_gf_mul_2_beta = engine.decrypt(gf_mul_2_beta, secret_key)
+    dec_gf_mul_3_alpha = engine.decrypt(gf_mul_3_alpha, secret_key)
+    dec_gf_mul_3_beta = engine.decrypt(gf_mul_3_beta, secret_key)
+    dec_gf_mul_9_alpha = engine.decrypt(gf_mul_9_alpha, secret_key)
+    dec_gf_mul_9_beta = engine.decrypt(gf_mul_9_beta, secret_key)
+    dec_gf_mul_11_alpha = engine.decrypt(gf_mul_11_alpha, secret_key)
+    dec_gf_mul_11_beta = engine.decrypt(gf_mul_11_beta, secret_key)
+    dec_gf_mul_13_alpha = engine.decrypt(gf_mul_13_alpha, secret_key)
+    dec_gf_mul_13_beta = engine.decrypt(gf_mul_13_beta, secret_key)
+    dec_gf_mul_14_alpha = engine.decrypt(gf_mul_14_alpha, secret_key)
+    dec_gf_mul_14_beta = engine.decrypt(gf_mul_14_beta, secret_key)
     
-    int_dec_ct_hi = zeta_to_int(dec_ct_hi)
-    int_dec_ct_lo = zeta_to_int(dec_ct_lo)
+    # zeta to int
+    dec_gf_mul_2_alpha_int = zeta_to_int(dec_gf_mul_2_alpha)
+    dec_gf_mul_2_beta_int = zeta_to_int(dec_gf_mul_2_beta)
+    dec_gf_mul_3_alpha_int = zeta_to_int(dec_gf_mul_3_alpha)
+    dec_gf_mul_3_beta_int = zeta_to_int(dec_gf_mul_3_beta)
+    dec_gf_mul_9_alpha_int = zeta_to_int(dec_gf_mul_9_alpha)
+    dec_gf_mul_9_beta_int = zeta_to_int(dec_gf_mul_9_beta)
+    dec_gf_mul_11_alpha_int = zeta_to_int(dec_gf_mul_11_alpha)
+    dec_gf_mul_11_beta_int = zeta_to_int(dec_gf_mul_11_beta)
+    dec_gf_mul_13_alpha_int = zeta_to_int(dec_gf_mul_13_alpha)
+    dec_gf_mul_13_beta_int = zeta_to_int(dec_gf_mul_13_beta)
+    dec_gf_mul_14_alpha_int = zeta_to_int(dec_gf_mul_14_alpha)
+    dec_gf_mul_14_beta_int = zeta_to_int(dec_gf_mul_14_beta)
     
-    int_dec_ct_hi_3 = zeta_to_int(dec_ct_hi_3)
-    int_dec_ct_lo_3 = zeta_to_int(dec_ct_lo_3)
-    
-    print(int_dec_ct_hi[:16] * 16)
-    print(int_dec_ct_lo[:16])
-    
-    print(int_dec_ct_hi_3[:16] * 16)
-    print(int_dec_ct_lo_3[:16])
-
-    
-    
-    
+    # 결과 비교
+    print(f"gf_mul_2 결과 비교: {dec_gf_mul_2_alpha_int << 4 | dec_gf_mul_2_beta_int == alpha_beta_int_gf_mult_2}")
+    print(f"gf_mul_3 결과 비교: {dec_gf_mul_3_alpha_int << 4 | dec_gf_mul_3_beta_int == alpha_beta_int_gf_mult_3}")
+    print(f"gf_mul_9 결과 비교: {dec_gf_mul_9_alpha_int << 4 | dec_gf_mul_9_beta_int == alpha_beta_int_gf_mult_9}")
+    print(f"gf_mul_11 결과 비교: {dec_gf_mul_11_alpha_int << 4 | dec_gf_mul_11_beta_int == alpha_beta_int_gf_mult_11}")
+    print(f"gf_mul_13 결과 비교: {dec_gf_mul_13_alpha_int << 4 | dec_gf_mul_13_beta_int == alpha_beta_int_gf_mult_13}")
+    print(f"gf_mul_14 결과 비교: {dec_gf_mul_14_alpha_int << 4 | dec_gf_mul_14_beta_int == alpha_beta_int_gf_mult_14}")
