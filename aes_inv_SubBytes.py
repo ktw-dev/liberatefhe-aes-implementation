@@ -119,3 +119,76 @@ def inv_sbox_poly(ctx: CKKS_EngineContext, ct_hi_zeta: Any, ct_lo_zeta: Any) -> 
 def inverse_sub_bytes(ctx: CKKS_EngineContext, ct_hi_zeta: Any, ct_lo_zeta: Any):
     """Public API: aes_SubBytes와 동일한 시그니처를 가집니다."""
     return inv_sbox_poly(ctx, ct_hi_zeta, ct_lo_zeta)
+
+
+
+if __name__ == "__main__":
+    from aes_transform_zeta import int_to_zeta, zeta_to_int
+    from aes_split_to_nibble import split_to_nibbles
+    import time
+    
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
+    engine = engine_context.engine
+    public_key = engine_context.public_key
+    secret_key = engine_context.secret_key
+    relinearization_key = engine_context.relinearization_key
+    conjugation_key = engine_context.conjugation_key
+    bootstrap_key = engine_context.bootstrap_key
+    
+    print("engine init")
+    
+    # 1. Encrypt inputs
+    np.random.seed(42)
+    int_array = np.random.randint(0, 255, size=32768, dtype=np.uint8)
+
+    alpha_int, beta_int = split_to_nibbles(int_array)
+    
+    # Map to zeta domain
+    alpha = int_to_zeta(alpha_int)
+    beta  = int_to_zeta(beta_int)
+    
+    enc_alpha = engine.encrypt(alpha, public_key, level = 10)
+    enc_beta = engine.encrypt(beta, public_key, level = 10)
+    
+    # 2. Evaluate SubBytes operation
+    start_time = time.time()
+    print("sub_bytes.level: ", enc_alpha.level)
+    sub_bytes_hi, sub_bytes_lo = inverse_sub_bytes(engine_context, enc_alpha, enc_beta)
+    end_time = time.time()
+    print(f"SubBytes time taken: {end_time - start_time} seconds")
+    print("sub_bytes_hi.level: ", sub_bytes_hi.level)
+
+    start_time = time.time()
+    # 3. Decrypt result
+    decoded_zeta_hi = engine.decrypt(sub_bytes_hi, secret_key)
+    decoded_int_hi = zeta_to_int(decoded_zeta_hi)
+    decoded_zeta_lo = engine.decrypt(sub_bytes_lo, secret_key)
+    decoded_int_lo = zeta_to_int(decoded_zeta_lo)
+
+    print(decoded_int_hi)
+    print(decoded_int_lo)
+
+    # 4. Validate against NumPy AES-128 S-Box implementation
+    from aes_128_numpy import S_BOX  # NumPy reference S-Box table
+
+    # Expected SubBytes output using reference table
+    expected_bytes = S_BOX[int_array]
+
+    # Combine decrypted high/low nibbles from FHE evaluation
+    output_bytes = (decoded_int_hi.astype(np.uint8) << 4) | decoded_int_lo.astype(np.uint8)
+
+    # Compare
+    mismatches = np.sum(expected_bytes != output_bytes)
+    if mismatches == 0:
+        print("\u2705  SubBytes output matches NumPy AES S-Box for all samples!")
+    else:
+        print(f"\u274C  SubBytes mismatch in {mismatches} out of {int_array.size} samples.")
+        # Show first few mismatching indices for debugging
+        mismatch_idx = np.where(expected_bytes != output_bytes)[0][:10]
+        for idx in mismatch_idx:
+            in_byte = int(int_array[idx])
+            exp_byte = int(expected_bytes[idx])
+            out_byte = int(output_bytes[idx])
+            print(f"  idx {idx}: input 0x{in_byte:02X} -> expected 0x{exp_byte:02X}, got 0x{out_byte:02X}")
+        raise AssertionError("SubBytes result does not match reference implementation.")
+    
