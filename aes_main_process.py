@@ -23,7 +23,13 @@ import importlib.util
 import numpy as np
 import time
 from typing import Tuple
+
+# import custom modules
 from engine_context import CKKS_EngineContext
+from aes_block_array import blocks_to_flat_array
+from aes_split_to_nibble import split_to_nibbles
+from aes_key_array import key_to_flat_array
+from aes_transform_zeta import int_to_zeta, zeta_to_int
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers -------------------------------------------------------
@@ -41,16 +47,6 @@ def _load_module(fname: str, alias: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
     return module
-
-
-# Load helper scripts ----------------------------------------------------------
-
-aes_block_array = _load_module("aes_block_array.py", "aes_block_array")
-aes_split_to_nibble = _load_module("aes_split_to_nibble.py", "aes_split_to_nibble")
-# key handling utilities
-aes_key_array = _load_module("aes_key_array.py", "aes_key_array")
-# zeta transform utility
-aes_transform_zeta = _load_module("aes_transform_zeta.py", "aes_transform_zeta")
 
 # -----------------------------------------------------------------------------
 # Engine Initiation ------------------------------------------------------------
@@ -117,18 +113,14 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
     blocks = rng.integers(0, 256, size=(num_blocks, 16), dtype=np.uint8)
 
     # 2. Flatten to 1-D array following batching layout
-    flat = aes_block_array.blocks_to_flat_array(blocks)
+    flat = blocks_to_flat_array(blocks)
 
     # 3. Split each byte into upper / lower 4-bit nibbles
-    upper, lower = aes_split_to_nibble.split_to_nibbles(flat)
+    upper, lower = split_to_nibbles(flat)
 
     # 4. ζ-변환 (SIMD-style) – repeatable vectorized op
-    zeta_upper = aes_transform_zeta.int_to_zeta(upper)
-    zeta_lower = aes_transform_zeta.int_to_zeta(lower)
-    
-    # # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
-    # zeta_upper_list = [zeta_upper[i:i+2048] for i in range(0, len(zeta_upper), 2048)]
-    # zeta_lower_list = [zeta_lower[i:i+2048] for i in range(0, len(zeta_lower), 2048)]
+    zeta_upper = int_to_zeta(upper)
+    zeta_lower = int_to_zeta(lower)
 
     return blocks, flat, upper, lower, zeta_upper, zeta_lower
 
@@ -153,15 +145,11 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
     rng = rng or np.random.default_rng()
     key = rng.integers(0, 256, size=16, dtype=np.uint8)
 
-    key_flat = aes_key_array.key_to_flat_array(key, max_blocks)
-    key_upper, key_lower = aes_key_array.split_to_nibbles(key_flat)
+    key_flat = key_to_flat_array(key, max_blocks)
+    key_upper, key_lower = split_to_nibbles(key_flat)
 
-    key_zeta_upper = aes_transform_zeta.int_to_zeta(key_upper)
-    key_zeta_lower = aes_transform_zeta.int_to_zeta(key_lower)
-    
-    # # 5. 2048개 씩 16개의 개별 넘파이로 분할 후 리스트에 넣기 
-    # key_zeta_upper_list = [key_zeta_upper[i:i+2048] for i in range(0, len(key_zeta_upper), 2048)]
-    # key_zeta_lower_list = [key_zeta_lower[i:i+2048] for i in range(0, len(key_zeta_lower), 2048)]
+    key_zeta_upper = int_to_zeta(key_upper)
+    key_zeta_lower = int_to_zeta(key_lower)
 
     return key, key_flat, key_upper, key_lower, key_zeta_upper, key_zeta_lower
 
@@ -169,10 +157,8 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
 # Key Scheduling --------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-def key_scheduling(engine_context, key_zeta_hi_list, key_zeta_lo_list):
+def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     pass
-
-
 
 
 
@@ -214,19 +200,14 @@ if __name__ == "__main__":
         raise SystemExit("❌  Block count must be between 1 and 2048 inclusive.")
     
     # --- Engine initiation stage -----------------------------------------------
-    fixed_rotation = True
-    delta_list = [1*2048, 2*2048, 3*2048, 4*2048, -1*2048, -2*2048, -3*2048, -4*2048]
-    engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, use_multiparty = False, thread_count = 16, device_id = 0, fixed_rotation=fixed_rotation, delta_list=delta_list)
+    delta_list = [1*2048, 2*2048, 3*2048, 4*2048, 8*2048, -1*2048, -2*2048, -3*2048, -4*2048]
+    
+    engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta_list)
+    # fixed rotation, delta_list는 필수로 사용함
     
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
-    secret_key = engine_context.get_secret_key()
-    relinearization_key = engine_context.get_relinearization_key()
-    conjugation_key = engine_context.get_conjugation_key()
-    rotation_key = engine_context.get_rotation_key()
-    small_bootstrap_key = engine_context.get_small_bootstrap_key()
-    bootstrap_key = engine_context.get_bootstrap_key()
-    
+    secret_key = engine_context.get_secret_key()   
 
     wait_next_stage("Engine Initiation", "Data initiation")
     

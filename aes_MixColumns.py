@@ -74,13 +74,11 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # ----------------------------------------------------------
     # -------------- 2. variable naming convention --------------
     # ----------------------------------------------------------
-    # gf_mul_2 연산을 오리지널 암호문에 대해 수행
-    one_ct_hi = gf_mul_2(engine_context, ct_hi, ct_lo)
-    one_ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)
+    # gf_mul_2 연산을 오리지널 암호문에 대해 수행: level 5 소모 
+    one_ct_hi, one_ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)    
     
-    # gf_mul_3 연산을 4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행
-    two_ct_hi = gf_mul_2(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
-    two_ct_lo = gf_mul_2(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
+    # gf_mul_3 연산을 4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행: level 10 소모
+    two_ct_hi, two_ct_lo = gf_mul_3(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
     
     three_ct_hi = ct_hi_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
     three_ct_lo = ct_lo_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
@@ -89,17 +87,46 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     four_ct_lo = ct_lo_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
     
     # -------------------------------------------------------
+    # ------------------ 3. Bootstrap 연산 -------------------
+    # -------------------------------------------------------
+    one_ct_hi_bootstrap = engine.bootstrap(one_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    one_ct_lo_bootstrap = engine.bootstrap(one_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    two_ct_hi_bootstrap = engine.bootstrap(two_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    two_ct_lo_bootstrap = engine.bootstrap(two_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    # DEBUG
+    print(f"one_ct_hi_bootstrap.level: {one_ct_hi_bootstrap.level}")
+    print(f"two_ct_hi_bootstrap.level: {two_ct_hi_bootstrap.level}")
+    print(f"three_ct_hi.level: {three_ct_hi.level}")
+    print(f"four_ct_hi.level: {four_ct_hi.level}")
+    
+    # -------------------------------------------------------
     # -------------------- 3. XOR 연산 -----------------------
     # -------------------------------------------------------
     # 각 xor마다 level 5 감소
-    mixed_ct_hi = _xor_operation(engine_context, one_ct_hi, two_ct_hi)
-    mixed_ct_hi = engine.bootstrap
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
     
-    mixed_ct_lo = _xor_operation(engine_context, one_ct_lo, two_ct_lo)
+    # high nibble
+    mixed_ct_hi = _xor_operation(engine_context, one_ct_hi_bootstrap, two_ct_hi_bootstrap)
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)
+    
+    # Bootstrap 연산 수행
+    mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
+        
+        
+    # low nibble
+    mixed_ct_lo = _xor_operation(engine_context, one_ct_lo_bootstrap, two_ct_lo_bootstrap)
     mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo)
+    
+    # Bootstrap 연산 수행
+    mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
     mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, four_ct_lo)
+    
+    # DEBUG
+    print(f"mixed_ct_hi.level: {mixed_ct_hi.level}")
+    print(f"mixed_ct_lo.level: {mixed_ct_lo.level}")
     
     return mixed_ct_hi, mixed_ct_lo
 
@@ -116,28 +143,33 @@ if __name__ == "__main__":
     conjugation_key = engine_context.conjugation_key
     bootstrap_key = engine_context.bootstrap_key
     
+    print("engine init")
+    
     # 1. Encrypt inputs
     np.random.seed(42)
     alpha_int = np.random.randint(0, 16, size=32768, dtype=np.uint8)
     beta_int  = np.random.randint(0, 16, size=32768, dtype=np.uint8)
-    expected_int = np.bitwise_xor(alpha_int, beta_int)
 
     # Map to zeta domain
     alpha = int_to_zeta(alpha_int)
     beta  = int_to_zeta(beta_int)
     
-    enc_alpha = engine.encrypt(alpha, public_key)
-    enc_beta = engine.encrypt(beta, public_key)
+    enc_alpha = engine.encrypt(alpha, public_key, level = 10)
+    enc_beta = engine.encrypt(beta, public_key, level = 10)
     
+    print("mix_columns")
     # 2. Evaluate MixColumns operation
     start_time = time.time()
-    cipher_res = mix_columns(engine_context, enc_alpha, enc_beta)
+    mixed_ct_hi, mixed_ct_lo = mix_columns(engine_context, enc_alpha, enc_beta)
     end_time = time.time()
-    print(f"XOR time taken: {end_time - start_time} seconds")
+    print(f"MixColumns time taken: {end_time - start_time} seconds")
 
     start_time = time.time()
     # 3. Decrypt result
-    decoded_zeta = engine.decrypt(cipher_res, secret_key)
+    decoded_zeta = engine.decrypt(mixed_ct_hi, secret_key)
     decoded_int = zeta_to_int(decoded_zeta)
+    decoded_zeta_lo = engine.decrypt(mixed_ct_lo, secret_key)
+    decoded_int_lo = zeta_to_int(decoded_zeta_lo)
     
-    print(np.all(decoded_int == expected_int))
+    print(decoded_int)
+    print(decoded_int_lo)

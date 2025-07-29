@@ -6,7 +6,7 @@ from engine_context import CKKS_EngineContext
 from aes_transform_zeta import int_cipher_to_zeta_cipher
 
 _BASE = os.path.dirname(__file__)
-_COEFF_PATH = os.path.join(_BASE, "coeff", "sbox_coeff.json")
+_COEFF_PATH = os.path.join(_BASE, "coeffs", "sbox_coeffs.json")
 with open(_COEFF_PATH, "r", encoding="utf-8") as f:
     _data = json.load(f)
 C_hi: np.ndarray = (np.array(_data["sbox_upper_mv_coeffs_real"]) + 1j * np.array(_data["sbox_upper_mv_coeffs_imag"]))
@@ -72,15 +72,15 @@ def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tup
                 if abs(C_lo[j, idx_y]) >= _EPS:
                     inner_terms_lo.append(engine.multiply(ct_hi_pow, pt_c_lo[j, idx_y]))
             
-            inner_sum_hi = _sum_terms_tree(inner_terms_hi, engine_context)
-            inner_sum_lo = _sum_terms_tree(inner_terms_lo, engine_context)
+            inner_sum_hi = _sum_terms_tree(engine_context, inner_terms_hi)
+            inner_sum_lo = _sum_terms_tree(engine_context, inner_terms_lo)
             
             ct_lo_pow = lo_basis[i]
             baby_step_terms_hi.append(engine.multiply(inner_sum_hi, ct_lo_pow, rlk))
             baby_step_terms_lo.append(engine.multiply(inner_sum_lo, ct_lo_pow, rlk))
 
-        chunk_results_hi.append(_sum_terms_tree(baby_step_terms_hi, engine_context))
-        chunk_results_lo.append(_sum_terms_tree(baby_step_terms_lo, engine_context))
+        chunk_results_hi.append(_sum_terms_tree(engine_context, baby_step_terms_hi))
+        chunk_results_lo.append(_sum_terms_tree(engine_context, baby_step_terms_lo))
 
     final_result_hi = chunk_results_hi[0]
     final_result_lo = chunk_results_lo[0]
@@ -91,10 +91,13 @@ def sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tup
         term_lo = engine.multiply(chunk_results_lo[m], ct_lo_pow_k, rlk)
         final_result_lo = engine.add(final_result_lo, term_lo)
     
+    final_result_hi = engine.bootstrap(final_result_hi, rlk, conj_key, engine_context.get_bootstrap_key())
+    final_result_lo = engine.bootstrap(final_result_lo, rlk, conj_key, engine_context.get_bootstrap_key())
+    
     # 지금까지의 결과는 정수 형태이므로, 이를 ζ 형태로 변환한다. 
     final_result_hi = int_cipher_to_zeta_cipher(engine_context, final_result_hi)
     final_result_lo = int_cipher_to_zeta_cipher(engine_context, final_result_lo)
-    
+       
     return final_result_hi, final_result_lo
 
 # API with context first
@@ -103,8 +106,72 @@ def sub_bytes(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
 
 
 
-def main():
-    pass
-
 if __name__ == "__main__":
-    main()
+    from aes_transform_zeta import int_to_zeta, zeta_to_int
+    from aes_split_to_nibble import split_to_nibbles
+    import time
+    
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
+    engine = engine_context.engine
+    public_key = engine_context.public_key
+    secret_key = engine_context.secret_key
+    relinearization_key = engine_context.relinearization_key
+    conjugation_key = engine_context.conjugation_key
+    bootstrap_key = engine_context.bootstrap_key
+    
+    print("engine init")
+    
+    # 1. Encrypt inputs
+    np.random.seed(42)
+    int_array = np.random.randint(0, 255, size=32768, dtype=np.uint8)
+
+    alpha_int, beta_int = split_to_nibbles(int_array)
+    
+    # Map to zeta domain
+    alpha = int_to_zeta(alpha_int)
+    beta  = int_to_zeta(beta_int)
+    
+    enc_alpha = engine.encrypt(alpha, public_key, level = 10)
+    enc_beta = engine.encrypt(beta, public_key, level = 10)
+    
+    # 2. Evaluate SubBytes operation
+    start_time = time.time()
+    print("sub_bytes.level: ", enc_alpha.level)
+    sub_bytes_hi, sub_bytes_lo = sub_bytes(engine_context, enc_alpha, enc_beta)
+    end_time = time.time()
+    print(f"SubBytes time taken: {end_time - start_time} seconds")
+    print("sub_bytes_hi.level: ", sub_bytes_hi.level)
+
+    start_time = time.time()
+    # 3. Decrypt result
+    decoded_zeta = engine.decrypt(sub_bytes_hi, secret_key)
+    decoded_int_hi = zeta_to_int(decoded_zeta)
+    decoded_zeta_lo = engine.decrypt(sub_bytes_lo, secret_key)
+    decoded_int_lo = zeta_to_int(decoded_zeta_lo)
+    
+    print(decoded_int_hi)
+    print(decoded_int_lo)
+
+    # 4. Validate against NumPy AES-128 S-Box implementation
+    from aes_128_numpy import S_BOX  # NumPy reference S-Box table
+
+    # Expected SubBytes output using reference table
+    expected_bytes = S_BOX[int_array]
+
+    # Combine decrypted high/low nibbles from FHE evaluation
+    output_bytes = (decoded_int_hi.astype(np.uint8) << 4) | decoded_int_lo.astype(np.uint8)
+
+    # Compare
+    mismatches = np.sum(expected_bytes != output_bytes)
+    if mismatches == 0:
+        print("\u2705  SubBytes output matches NumPy AES S-Box for all samples!")
+    else:
+        print(f"\u274C  SubBytes mismatch in {mismatches} out of {int_array.size} samples.")
+        # Show first few mismatching indices for debugging
+        mismatch_idx = np.where(expected_bytes != output_bytes)[0][:10]
+        for idx in mismatch_idx:
+            in_byte = int(int_array[idx])
+            exp_byte = int(expected_bytes[idx])
+            out_byte = int(output_bytes[idx])
+            print(f"  idx {idx}: input 0x{in_byte:02X} -> expected 0x{exp_byte:02X}, got 0x{out_byte:02X}")
+        raise AssertionError("SubBytes result does not match reference implementation.")
