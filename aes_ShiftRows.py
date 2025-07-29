@@ -179,13 +179,13 @@ if __name__ == "__main__":
 
     print("engine init")
 
-    # 1. 테스트 입력 준비
-    np.random.seed(42)
-    # AES state 16바이트 패턴을 여러 블록에 반복
-    # 한 블록 = [0,1,...,15], 여러 블록으로 채움
-    single_block = np.arange(16, dtype=np.uint8)
-    num_blocks = 32768 // 16
-    int_array = np.tile(single_block, num_blocks)
+    # 0~15 값을 각각 2048번 반복
+    slots_per_value = 2048
+    single_values = np.arange(16, dtype=np.uint8)
+    int_array = np.repeat(single_values, slots_per_value)
+
+    print(int_array.shape)  # (32768,)
+    print(int_array[:10])   # 0,0,0,...,1,1,1,...
 
     # hi/lo nibble로 분할
     alpha_int, beta_int = split_to_nibbles(int_array)
@@ -211,13 +211,13 @@ if __name__ == "__main__":
     # 4. NumPy 참값 계산 (column-major 레이아웃 가정)
     def numpy_shift_rows_column_major(state_bytes: np.ndarray) -> np.ndarray:
         # state_bytes: flat 배열, 여러 블록 존재
-        reshaped = state_bytes.reshape(-1, 4, 4, order='F')  # column-major 해석
+        reshaped = state_bytes.reshape(-1, 4, 4)  # column-major 해석
         # ShiftRows 수행
         for block in reshaped:
             block[1] = np.roll(block[1], -1)  # Row1 left shift by 1
             block[2] = np.roll(block[2], -2)  # Row2 left shift by 2
             block[3] = np.roll(block[3], -3)  # Row3 left shift by 3
-        return reshaped.reshape(-1, order='F')
+        return reshaped.reshape(-1)
 
     expected_bytes = numpy_shift_rows_column_major(int_array)
 
