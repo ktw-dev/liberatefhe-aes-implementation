@@ -30,6 +30,11 @@ from aes_block_array import blocks_to_flat_array
 from aes_split_to_nibble import split_to_nibbles
 from aes_key_array import key_to_flat_array
 from aes_transform_zeta import int_to_zeta, zeta_to_int
+from aes_xor import _xor_operation
+from aes_key_scheduling import key_scheduling
+from aes_inv_SubBytes import inverse_sub_bytes
+from aes_inv_ShiftRows import inverse_shift_rows
+from aes_inv_MixColumns import inverse_mix_columns
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers -------------------------------------------------------
@@ -158,8 +163,18 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
 # -----------------------------------------------------------------------------
 
 def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
-    pass
+    scheduled_hi_list, scheduled_lo_list = key_scheduling(engine_context, enc_key_hi, enc_key_lo)
+    return scheduled_hi_list, scheduled_lo_list
 
+
+
+# -----------------------------------------------------------------------------
+# AddRoundKey --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+def AddRoundKey(engine_context, enc_data, key_list):
+    enc_data = _xor_operation(engine_context, enc_data, key_list)
+    return enc_data
 
 
 
@@ -258,12 +273,44 @@ if __name__ == "__main__":
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
     # --- key Scheduling stage -------------------------------------------------
+    key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_hi, enc_key_lo)
+    
+    # --- Encryption stage ----------------------------------------------------
+    # 대충 암호화 하는 과정
+    enc_data_hi = None
+    enc_data_lo = None
+    wait_next_stage("encryption stage", "decryption stage")
 
-
-
-    # --- AddRoundKey stage ----------------------------------------------------
+    # --- Decryption stage ----------------------------------------------------
+    
+    # 암호화된 데이터 사용
+    enc_data_hi = enc_data_hi
+    enc_data_lo = enc_data_lo
+    
+    # 기존의 키 리스트 사용(역순)
+    key_hi_list = [key_hi_list[::-1]]
+    key_lo_list = [key_lo_list[::-1]]
+        
+    # --- Round 0 --------------------------------------------------------------
+    enc_data_hi_round_0 = AddRoundKey(enc_data_hi, key_hi_list[0])
+    enc_data_lo_round_0 = AddRoundKey(enc_data_lo, key_lo_list[0])
+        
+    enc_data_hi_round_0, enc_data_lo_round_0 = inverse_shift_rows(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
+    
+    enc_data_hi_round_1, enc_data_lo_round_1 = inverse_sub_bytes(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
+    
+    # --- Round 1 --------------------------------------------------------------
+    enc_data_hi_round_1 = AddRoundKey(enc_data_hi_round_1, key_hi_list[1])
+    enc_data_lo_round_1 = AddRoundKey(enc_data_lo_round_1, key_lo_list[1])
+    
+    enc_data_hi_round_1, enc_data_lo_round_1 = inverse_mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    
+    enc_data_hi_round_1, enc_data_lo_round_1 = inverse_shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    
+    enc_data_hi_round_2, enc_data_lo_round_2 = inverse_sub_bytes(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     
     
     
     
-    # Stage 1: SubBytes
+    
+    
