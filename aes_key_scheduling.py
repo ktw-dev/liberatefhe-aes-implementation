@@ -41,6 +41,16 @@ from aes_SubBytes import sub_bytes
 
 _THIS_DIR = pathlib.Path(__file__).resolve().parent
 
+AES_RCON = np.array([
+    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
+], dtype=np.uint8)
+
+aes_rcon_hi = np.array([
+    0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x4, 0x8, 0x1, 0x3
+], dtype=np.uint8)
+aes_rcon_lo = np.array([
+    0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0, 0xb, 0x6
+], dtype=np.uint8)
 
 def _load_module(fname: str, alias: str):
     """Load a Python file in the current directory as a module with *alias*."""
@@ -93,8 +103,6 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # load engine and keys
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
-    secret_key = engine_context.get_secret_key()
-    relin_key = engine_context.get_relinearization_key()
     fixed_rotation_key_neg_2048 = engine_context.get_fixed_rotation_key(-2048)
     fixed_rotation_key_3_2048 = engine_context.get_fixed_rotation_key(3 * 2048)
     
@@ -102,22 +110,18 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     max_blocks = 2048
     _13_bytes_mask = np.concatenate([np.zeros(12 * max_blocks), np.ones(max_blocks), np.zeros(3 * max_blocks)])
     _141516_bytes_mask = np.concatenate([np.zeros(13 * max_blocks), np.ones(3 * max_blocks)])
-    _remained_bytes_mask = np.concatenate([np.ones(12 * max_blocks), np.zeros(4 * max_blocks)])
     
     # ------------------------------transform mask to plaintext------------------------------
     _13_bytes_mask_plain = engine.encode(_13_bytes_mask)
     _141516_bytes_mask_plain = engine.encode(_141516_bytes_mask)
-    _remained_bytes_mask_plain = engine.encode(_remained_bytes_mask)
     
     # ------------------------------Masking hi bytes------------------------------
     _13_bytes_enc_hi = engine.multiply(enc_key_hi, _13_bytes_mask_plain)
     _141516_bytes_enc_hi = engine.multiply(enc_key_hi, _141516_bytes_mask_plain)
-    _remained_bytes_enc_hi = engine.multiply(enc_key_hi, _remained_bytes_mask_plain)
     
     # ------------------------------Masking lo bytes------------------------------
     _13_bytes_enc_lo = engine.multiply(enc_key_lo, _13_bytes_mask_plain)
     _141516_bytes_enc_lo = engine.multiply(enc_key_lo, _141516_bytes_mask_plain)
-    _remained_bytes_enc_lo = engine.multiply(enc_key_lo, _remained_bytes_mask_plain)
     
     # ------------------------------Apply RotWord to hi bytes------------------------------
     # Move secondtofourth_bytes to positions 0,1,2 and first_bytes to position 3
@@ -125,14 +129,13 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     new_position_16 = engine.fixed_rotate(_13_bytes_enc_hi, fixed_rotation_key_3_2048)
 
     rotated_hi_bytes = engine.add(new_positions_131415, new_position_16)
-    rotated_hi_bytes = engine.add(rotated_hi_bytes, _remained_bytes_enc_hi)
     
     # ------------------------------Apply RotWord to lo bytes------------------------------
     new_positions_131415 = engine.rotate(_141516_bytes_enc_lo, fixed_rotation_key_neg_2048)
     new_position_16 = engine.fixed_rotate(_13_bytes_enc_lo, fixed_rotation_key_3_2048)
 
+    # 나머지 자리는 자연스럽게 0으로 초기화된다.
     rotated_lo_bytes = engine.add(new_positions_131415, new_position_16)
-    rotated_lo_bytes = engine.add(rotated_lo_bytes, _remained_bytes_enc_lo)
 
     return rotated_hi_bytes, rotated_lo_bytes
 
@@ -141,8 +144,52 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     sub_bytes_hi, sub_bytes_lo = sub_bytes(engine_context, enc_key_hi, enc_key_lo)
     return sub_bytes_hi, sub_bytes_lo
 
-def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
-    pass
+def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_num: int):
+    """Apply Rcon XOR to the first byte of the key.
+    
+    Parameters
+    ----------
+    engine_context : CKKS_EngineContext
+    enc_key_hi : Ciphertext
+    enc_key_lo : Ciphertext  
+    round_num : int
+        Round number (0-9) for selecting Rcon value
+        
+    Returns
+    -------
+    result_hi : Ciphertext
+    result_lo : Ciphertext
+    """
+    engine = engine_context.get_engine()
+    public_key = engine_context.get_public_key()
+    
+    max_blocks = 2048
+    
+    # Create Rcon mask - only first byte position
+    first_byte_mask = np.concatenate([np.ones(max_blocks), np.zeros(15 * max_blocks)])
+    
+    # Get Rcon value and transform to zeta
+    rcon_value = AES_RCON[round_num]
+    rcon_hi = (rcon_value >> 4) & 0x0F
+    rcon_lo = rcon_value & 0x0F
+    
+    # Transform to zeta representation
+    rcon_zeta_hi = transform_to_zeta(np.full(16 * max_blocks, rcon_hi))
+    rcon_zeta_lo = transform_to_zeta(np.full(16 * max_blocks, rcon_lo))
+    
+    # Apply mask to Rcon
+    rcon_zeta_hi_masked = rcon_zeta_hi * first_byte_mask
+    rcon_zeta_lo_masked = rcon_zeta_lo * first_byte_mask
+    
+    # Encode as plaintext
+    rcon_plain_hi = engine.encode(rcon_zeta_hi_masked)
+    rcon_plain_lo = engine.encode(rcon_zeta_lo_masked)
+    
+    # XOR with key using plaintext-ciphertext addition
+    result_hi = _xor_operation(engine_context, enc_key_hi, engine.encrypt(rcon_plain_hi, public_key))
+    result_lo = _xor_operation(engine_context, enc_key_lo, engine.encrypt(rcon_plain_lo, public_key))
+    
+    return result_hi, result_lo
 
 def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     return _xor_operation(engine_context, enc_key_hi, enc_key_lo)
@@ -175,9 +222,105 @@ def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     enc_key_hi : Ciphertext
     enc_key_lo : Ciphertext
     
+    Dependencies Analysis:
+    W[4] = W[0] ⊕ f(W[3]) ⊕ Rcon[1]   ← W[3]에 의존
+    W[5] = W[1] ⊕ W[4]                ← W[4]에 의존  
+    W[6] = W[2] ⊕ W[5]                ← W[5]에 의존
+    W[7] = W[3] ⊕ W[6]                ← W[6]에 의존
+    
+    W[0]  W[1]  W[2]  W[3]  ← 초기 키 (병렬 가능)
+    │     │     │     │
+    │     │     │   ┌─┴─┐
+    │     │     │   │f()│   ← SubWord(RotWord) + Rcon
+    │     │     │   └─┬─┘
+    └─────┼─────┼─────┴──→ W[4]
+          │     │           │
+          └─────┼───────────┴──→ W[5]
+                │                │  
+                └────────────────┴──→ W[6]
+
+
     Returns
     -------
+    round_keys_hi : list[Ciphertext]
+    round_keys_lo : list[Ciphertext]
 
-
+    특이사항
+    ------
+    - 키 확장 과정은 모든 워드가 이전 워드에 의존하기 때문에 병렬이 불가능하다.
+    - 따라서 모든 키를 처리시 하나의 워드 씩 분리하여 처리한다. 즉 44개의 암호문을 생성하고 처리하게 될 것이다.
+    - 이 과정에서 xor 연산 시 레벨이 5씩 감소하기 때문에 xor 처리하기 전 레벨이 5 미만이라면 부트스트랩을 통해 레벨을 10으로 만들어준다.
     """
-    pass
+    engine = engine_context.get_engine()
+    public_key = engine_context.get_public_key()
+    
+    max_blocks = 2048
+    
+    # Initialize round keys list with original key as first round key
+    word_hi = []
+    word_lo = []
+    
+    # ------------------------------Masking------------------------------
+    word_0_mask = np.concatenate(np.ones(4 * max_blocks), np.zeros(12 * max_blocks))
+    word_1_mask = np.concatenate(np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks))
+    word_2_mask = np.concatenate(np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks))
+    word_3_mask = np.concatenate(np.zeros(12 * max_blocks), np.ones(4 * max_blocks))
+    
+    word_0_mask_plain = engine.encode(word_0_mask)
+    word_1_mask_plain = engine.encode(word_1_mask)
+    word_2_mask_plain = engine.encode(word_2_mask)
+    word_3_mask_plain = engine.encode(word_3_mask)
+    
+    # ------------------------------Masking hi bytes------------------------------
+    word_0_enc_hi = engine.multiply(enc_key_hi, word_0_mask_plain)
+    word_1_enc_hi = engine.multiply(enc_key_hi, word_1_mask_plain)
+    word_2_enc_hi = engine.multiply(enc_key_hi, word_2_mask_plain)
+    word_3_enc_hi = engine.multiply(enc_key_hi, word_3_mask_plain)
+    
+    # ------------------------------Masking lo bytes------------------------------
+    word_0_enc_lo = engine.multiply(enc_key_lo, word_0_mask_plain)
+    word_1_enc_lo = engine.multiply(enc_key_lo, word_1_mask_plain)
+    word_2_enc_lo = engine.multiply(enc_key_lo, word_2_mask_plain)
+    word_3_enc_lo = engine.multiply(enc_key_lo, word_3_mask_plain)
+    
+    # ------------------------------append to word_hi and word_lo------------------------------
+    word_hi.append(word_0_enc_hi)
+    word_lo.append(word_0_enc_lo)
+    word_hi.append(word_1_enc_hi)
+    word_lo.append(word_1_enc_lo)
+    word_hi.append(word_2_enc_hi)
+    word_lo.append(word_2_enc_lo)
+    word_hi.append(word_3_enc_hi)
+    word_lo.append(word_3_enc_lo)
+    
+    return None, None
+    
+    
+    
+if __name__ == "__main__":
+    from aes_main_process import engine_initiation, key_initiation
+    from aes_transform_zeta import zeta_to_int
+    engine_context = engine_initiation(signature=1)
+    _, _, key_upper, key_lower, key_zeta_upper, key_zeta_lower = key_initiation()
+    
+    enc_key_hi, enc_key_lo = key_scheduling(engine_context, key_zeta_upper, key_zeta_lower)
+    print(enc_key_hi)
+    print(enc_key_lo)
+    
+    print(key_upper[12*2048], key_upper[13*2048], key_upper[14*2048], key_upper[15*2048])
+    print(key_lower[12*2048], key_lower[13*2048], key_lower[14*2048], key_lower[15*2048])
+    
+    rot_word_hi, rot_word_lo = _rot_word(engine_context, enc_key_hi, key_zeta_lower)
+
+    decrypted_rot_word_hi = engine_context.decrypt(rot_word_hi)
+    decrypted_rot_word_lo = engine_context.decrypt(rot_word_lo)
+
+    word_hi_int = zeta_to_int(decrypted_rot_word_hi)
+    word_lo_int = zeta_to_int(decrypted_rot_word_lo)
+
+    print(word_hi_int[12*2048], word_hi_int[13*2048], word_hi_int[14*2048], word_hi_int[15*2048])
+    print(word_lo_int[12*2048], word_lo_int[13*2048], word_lo_int[14*2048], word_lo_int[15*2048])
+    
+    
+    
+    
