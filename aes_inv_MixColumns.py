@@ -160,48 +160,45 @@ if __name__ == "__main__":
 
     
     def inv_mix_columns_numpy(arr: np.ndarray) -> np.ndarray:
+        """Vectorised inverse MixColumns (NumPy).
+
+        Parameters
+        ----------
+        arr : np.ndarray
+            Array with shape (N, 4, 4) and dtype uint8. Any leading dimension
+            *N* represents the number of AES states.
+        Returns
+        -------
+        np.ndarray
+            Array of same shape/type with inverse MixColumns applied.
         """
-        NumPy-only Inverse MixColumns.
-        arr.dtype must be uint8 and total length a multiple of 16 (4-byte columns).
-        """
+
         a = np.asarray(arr, dtype=np.uint8)
+        if a.shape[-2:] != (4, 4):
+            raise ValueError("input last two dims must be (4,4)")
+
         st = a.copy()
-        
-        # Use lookup tables for GF multiplication
         from aes_gf_mult import gf_mult_lookup
         
-        # Process each column (4 columns) vectorised over batch N
-         # mix_columns_numpy와 동일한 방식으로 분해
-        s0, s1, s2, s3 = st[:, 0], st[:, 1], st[:, 2], st[:, 3]
+        # For each column apply inverse MixColumns formula using lookup tables
+        for col in range(4):
+            s0 = st[:, 0, col]
+            s1 = st[:, 1, col]
+            s2 = st[:, 2, col]
+            s3 = st[:, 3, col]
 
-        # 벡터화된 inverse MixColumns 적용
-        st[:, 0] = (
-            gf_mult_lookup(s0, 14) ^
-            gf_mult_lookup(s1, 11) ^
-            gf_mult_lookup(s2, 13) ^
-            gf_mult_lookup(s3, 9)
-        )
-        
-        st[:, 1] = (
-            gf_mult_lookup(s0, 9) ^
-            gf_mult_lookup(s1, 14) ^
-            gf_mult_lookup(s2, 11) ^
-            gf_mult_lookup(s3, 13)
-        )
-        
-        st[:, 2] = (
-            gf_mult_lookup(s0, 13) ^
-            gf_mult_lookup(s1, 9) ^
-            gf_mult_lookup(s2, 14) ^
-            gf_mult_lookup(s3, 11)
-        )
-        
-        st[:, 3] = (
-            gf_mult_lookup(s0, 11) ^
-            gf_mult_lookup(s1, 13) ^
-            gf_mult_lookup(s2, 9) ^
-            gf_mult_lookup(s3, 14)
-        )
+            st[:, 0, col] = (
+                gf_mult_lookup(s0, 14) ^ gf_mult_lookup(s1, 11) ^ gf_mult_lookup(s2, 13) ^ gf_mult_lookup(s3, 9)
+            )
+            st[:, 1, col] = (
+                gf_mult_lookup(s0, 9) ^ gf_mult_lookup(s1, 14) ^ gf_mult_lookup(s2, 11) ^ gf_mult_lookup(s3, 13)
+            )
+            st[:, 2, col] = (
+                gf_mult_lookup(s0, 13) ^ gf_mult_lookup(s1, 9) ^ gf_mult_lookup(s2, 14) ^ gf_mult_lookup(s3, 11)
+            )
+            st[:, 3, col] = (
+                gf_mult_lookup(s0, 11) ^ gf_mult_lookup(s1, 13) ^ gf_mult_lookup(s2, 9) ^ gf_mult_lookup(s3, 14)
+            )
 
         return st
         
@@ -238,8 +235,38 @@ if __name__ == "__main__":
     print(numpy_result[0, :, :])
 
     decoded_int = decoded_int_hi << 4 | decoded_int_lo
+
+    # helper: return indices of k-th AES state inside flat vector (column-major layout)
+    def state_indices(k: int) -> np.ndarray:
+        base = k
+        # positions are (col*4 + row) * 2048 + k
+        offs = np.array([
+            0,  1,  2,  3,
+            4,  5,  6,  7,
+            8,  9, 10, 11,
+            12, 13, 14, 15
+        ]) * 2048
+        return base + offs
+
+    idx0 = state_indices(0)  # first state
+    decoded_first = decoded_int[idx0]
+
+    print("decoded first state:", decoded_first)
+    print("numpy first state  :", numpy_result[0].reshape(-1))
+    print("match mask         :", numpy_result[0].reshape(-1) == decoded_first)
     
-    print(decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048])
     
-    decoded_int_first_block = np.array([decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048]])
-    print(numpy_result[0, :, :].reshape(-1) == decoded_int_first_block)
+    idx0 = state_indices(1)  # first state
+    decoded_first = decoded_int[idx0]
+
+    print("decoded first state:", decoded_first)
+    print("numpy first state  :", numpy_result[1].reshape(-1))
+    print("match mask         :", numpy_result[1].reshape(-1) == decoded_first)
+    
+    
+    idx0 = state_indices(2)  # first state
+    decoded_first = decoded_int[idx0]
+
+    print("decoded first state:", decoded_first)
+    print("numpy first state  :", numpy_result[2].reshape(-1))
+    print("match mask         :", numpy_result[2].reshape(-1) == decoded_first)
