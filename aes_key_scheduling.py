@@ -81,7 +81,7 @@ __all__ = [
 ]
 
 
-def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+def _rot_word_int_domain(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     """Apply RotWord operation to the first 4 word (bytes 0-3) of flat key array.
     
     SIMD batching된 키를 입력으로 받아, 첫 행의 4 bytes를 왼쪽으로 1 byte circular shift하는 연산을 취한 후 반환한다.
@@ -104,11 +104,30 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
     
+    # ------------------------------Masking------------------------------
+    key_mask_0_0 = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
+    key_mask_0_123 = np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
+    
+    key_mask_0_0_plain = engine.encode(key_mask_0_0)
+    key_mask_0_123_plain = engine.encode(key_mask_0_123)
+    
+    key_mask_hi_0_0 = engine.multiply(enc_key_hi, key_mask_0_0_plain)
+    key_mask_hi_0_123 = engine.multiply(enc_key_hi, key_mask_0_123_plain)
+    
+    key_mask_lo_0_0 = engine.multiply(enc_key_lo, key_mask_0_0_plain)
+    key_mask_lo_0_123 = engine.multiply(enc_key_lo, key_mask_0_123_plain)
+        
     # ------------------------------Rotating------------------------------
-    rotated_hi_bytes = engine.rotate(enc_key_hi, engine_context.get_fixed_rotation_key(4 * 2048))
-    rotated_lo_bytes = engine.rotate(enc_key_lo, engine_context.get_fixed_rotation_key(4 * 2048))
+    rotated_hi_0_to_3 = engine.rotate(key_mask_hi_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
+    rotated_hi_123_to_012 = engine.rotate(key_mask_hi_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
 
-    return rotated_hi_bytes, rotated_lo_bytes
+    rotated_lo_0_to_3 = engine.rotate(key_mask_lo_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
+    rotated_lo_123_to_012 = engine.rotate(key_mask_lo_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
+
+    rotated_hi = engine.multiply(rotated_hi_0_to_3, rotated_hi_123_to_012, engine_context.get_relinearization_key())
+    rotated_lo = engine.multiply(rotated_lo_0_to_3, rotated_lo_123_to_012, engine_context.get_relinearization_key())
+
+    return rotated_hi, rotated_lo
     
 
 
@@ -166,7 +185,7 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
 def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi, xor_key_lo):
     return _xor_operation(engine_context, enc_key_hi, xor_key_hi), _xor_operation(engine_context, enc_key_lo, xor_key_lo)
 
-def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
+def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     """
     AES key scheduling algorithm
     
@@ -228,49 +247,15 @@ def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     
     max_blocks = 2048
     
-    # Initialize round keys list with original key as first round key
-    word_hi = []
-    word_lo = []
-    
-    # ------------------------------Masking------------------------------
-    word_0_mask = np.concatenate((np.ones(4 * max_blocks), np.zeros(12 * max_blocks)))
-    word_1_mask = np.concatenate((np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks)))
-    word_2_mask = np.concatenate((np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks)))
-    word_3_mask = np.concatenate((np.zeros(12 * max_blocks), np.ones(4 * max_blocks)))
-    
-    word_0_mask_plain = engine.encode(word_0_mask)
-    word_1_mask_plain = engine.encode(word_1_mask)
-    word_2_mask_plain = engine.encode(word_2_mask)
-    word_3_mask_plain = engine.encode(word_3_mask)
-    
-    # ------------------------------Masking hi bytes------------------------------
-    word_0_enc_hi = engine.multiply(enc_key_hi, word_0_mask_plain)
-    word_1_enc_hi = engine.multiply(enc_key_hi, word_1_mask_plain)
-    word_2_enc_hi = engine.multiply(enc_key_hi, word_2_mask_plain)
-    word_3_enc_hi = engine.multiply(enc_key_hi, word_3_mask_plain)
-    
-    # ------------------------------Masking lo bytes------------------------------
-    word_0_enc_lo = engine.multiply(enc_key_lo, word_0_mask_plain)
-    word_1_enc_lo = engine.multiply(enc_key_lo, word_1_mask_plain)
-    word_2_enc_lo = engine.multiply(enc_key_lo, word_2_mask_plain)
-    word_3_enc_lo = engine.multiply(enc_key_lo, word_3_mask_plain)
-    
-    # ------------------------------append to word_hi and word_lo------------------------------
-    word_hi.append(word_0_enc_hi)
-    word_lo.append(word_0_enc_lo)
-    word_hi.append(word_1_enc_hi)
-    word_lo.append(word_1_enc_lo)
-    word_hi.append(word_2_enc_hi)
-    word_lo.append(word_2_enc_lo)
-    word_hi.append(word_3_enc_hi)
-    word_lo.append(word_3_enc_lo)
+    word_hi = enc_key_hi_list.copy()
+    word_lo = enc_key_lo_list.copy()
     
         # key scheduling round 
     for i in range(4, 44):
         if i % 4 == 0:
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
-            rot_word_hi, rot_word_lo = _rot_word(engine_context, word_hi[i-1], word_lo[i-1])
-            sub_word_hi, sub_word_lo = _sub_word(engine_context, rot_word_hi, rot_word_lo)
+            sub_word_hi, sub_word_lo = _sub_word(engine_context, word_hi[i-1], word_lo[i-1])
+            rot_word_hi, rot_word_lo = _rot_word_int_domain(engine_context, sub_word_hi, sub_word_lo)
             rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i//4)
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
@@ -292,65 +277,49 @@ if __name__ == "__main__":
     engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta) 
     print(engine_context.get_slot_count())
     engine = engine_context.get_engine()
+    public_key = engine_context.get_public_key()
     
-    _, _, key_upper, key_lower, key_zeta_upper, key_zeta_lower = key_initiation()
+    _, _, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
     
     max_blocks = 2048
+
+    # 키 마스킹
+    key_mask_0 = np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)])
+    key_mask_1 = np.concatenate([np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)])
+    key_mask_2 = np.concatenate([np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)])
+    key_mask_3 = np.concatenate([np.zeros(12 * 2048), np.ones(4 * 2048)])
     
-    enc_key_hi = engine.encrypt(key_zeta_upper, engine_context.get_public_key())
-    enc_key_lo = engine.encrypt(key_zeta_lower, engine_context.get_public_key())
-    print(enc_key_hi)
-    print(enc_key_lo)
+    key_word_0_hi = key_upper * key_mask_0
+    key_word_1_hi = np.roll(key_upper * key_mask_1, -4 * 2048)
+    key_word_2_hi = np.roll(key_upper * key_mask_2, -8 * 2048)
+    key_word_3_hi = np.roll(key_upper * key_mask_3, -12 * 2048)
     
-    # ------------------------------Masking------------------------------
-    word_0_mask = np.concatenate((np.ones(4 * max_blocks), np.zeros(12 * max_blocks)))
-    word_1_mask = np.concatenate((np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks)))
-    word_2_mask = np.concatenate((np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks)))
-    word_3_mask = np.concatenate((np.zeros(12 * max_blocks), np.ones(4 * max_blocks)))
+    key_word_0_lo = key_lower * key_mask_0
+    key_word_1_lo = np.roll(key_upper * key_mask_1, -4 * 2048)
+    key_word_2_lo = np.roll(key_upper * key_mask_2, -8 * 2048)
+    key_word_3_lo = np.roll(key_upper * key_mask_3, -12 * 2048)
     
-    word_0_mask_plain = engine.encode(word_0_mask)
-    word_1_mask_plain = engine.encode(word_1_mask)
-    word_2_mask_plain = engine.encode(word_2_mask)
-    word_3_mask_plain = engine.encode(word_3_mask)
+    # 1. 키 암호화
+    enc_key_word_hi_0 = engine.encrypt(key_word_0_hi, public_key)
+    enc_key_word_lo_0 = engine.encrypt(key_word_0_lo, public_key)
+        
+    enc_key_word_hi_1 = engine.encrypt(key_word_1_hi, public_key)
+    enc_key_word_lo_1 = engine.encrypt(key_word_1_lo, public_key)
+
+    enc_key_word_hi_2 = engine.encrypt(key_word_2_hi, public_key)
+    enc_key_word_lo_2 = engine.encrypt(key_word_2_lo, public_key)
+
+    enc_key_word_hi_3 = engine.encrypt(key_word_3_hi, public_key)
+    enc_key_word_lo_3 = engine.encrypt(key_word_3_lo, public_key)
     
-    # ------------------------------Masking hi bytes------------------------------
-    word_0_enc_hi = engine.multiply(enc_key_hi, word_0_mask_plain)
-    word_1_enc_hi = engine.multiply(enc_key_hi, word_1_mask_plain)
-    word_2_enc_hi = engine.multiply(enc_key_hi, word_2_mask_plain)
-    word_3_enc_hi = engine.multiply(enc_key_hi, word_3_mask_plain)
+    enc_key_word_hi_list = [enc_key_word_hi_0, enc_key_word_hi_1, enc_key_word_hi_2, enc_key_word_hi_3]
+    enc_key_word_lo_list = [enc_key_word_lo_0, enc_key_word_lo_1, enc_key_word_lo_2, enc_key_word_lo_3]
     
-    # ------------------------------Masking lo bytes------------------------------
-    word_0_enc_lo = engine.multiply(enc_key_lo, word_0_mask_plain)
-    word_1_enc_lo = engine.multiply(enc_key_lo, word_1_mask_plain)
-    word_2_enc_lo = engine.multiply(enc_key_lo, word_2_mask_plain)
-    word_3_enc_lo = engine.multiply(enc_key_lo, word_3_mask_plain)
+    key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_word_hi_list, enc_key_word_lo_list)
     
-    word_0_dec_hi = engine.decrypt(word_0_enc_hi, engine_context.get_secret_key())
-    word_0_dec_lo = engine.decrypt(word_0_enc_lo, engine_context.get_secret_key())
-    word_1_dec_hi = engine.decrypt(word_1_enc_hi, engine_context.get_secret_key())
-    word_1_dec_lo = engine.decrypt(word_1_enc_lo, engine_context.get_secret_key())
-    word_2_dec_hi = engine.decrypt(word_2_enc_hi, engine_context.get_secret_key())
-    word_2_dec_lo = engine.decrypt(word_2_enc_lo, engine_context.get_secret_key())
-    word_3_dec_hi = engine.decrypt(word_3_enc_hi, engine_context.get_secret_key())
-    word_3_dec_lo = engine.decrypt(word_3_enc_lo, engine_context.get_secret_key())
+    print()
     
-    word_0_int_hi = zeta_to_int(word_0_dec_hi)
-    word_0_int_lo = zeta_to_int(word_0_dec_lo)
-    word_1_int_hi = zeta_to_int(word_1_dec_hi)
-    word_1_int_lo = zeta_to_int(word_1_dec_lo)
-    word_2_int_hi = zeta_to_int(word_2_dec_hi)
-    word_2_int_lo = zeta_to_int(word_2_dec_lo)
-    word_3_int_hi = zeta_to_int(word_3_dec_hi)
-    word_3_int_lo = zeta_to_int(word_3_dec_lo)
     
-    print(word_0_int_hi)
-    print(word_0_int_lo)
-    print(word_1_int_hi)
-    print(word_1_int_lo)
-    print(word_2_int_hi)
-    print(word_2_int_lo)
-    print(word_3_int_hi)
-    print(word_3_int_lo)
     
     
     

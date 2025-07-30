@@ -262,18 +262,44 @@ if __name__ == "__main__":
     
     # --- key HE-encryption stage ------------------------------------------------
     
-    # 1. 키 암호화
-    enc_key_hi = engine.encrypt(key_zeta_hi, public_key)
-    enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
+    # 키 마스킹
+    key_mask_0 = np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)])
+    key_mask_1 = np.concatenate([np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)])
+    key_mask_2 = np.concatenate([np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)])
+    key_mask_3 = np.concatenate([np.zeros(12 * 2048), np.ones(4 * 2048)])
     
-    # DEBUG
-    # print(enc_key_hi)
-    # print(enc_key_lo)
+    key_word_0_hi = key_zeta_hi * key_mask_0
+    key_word_1_hi = key_zeta_hi * key_mask_1
+    key_word_2_hi = key_zeta_hi * key_mask_2
+    key_word_3_hi = key_zeta_hi * key_mask_3
+    
+    key_word_0_lo = key_zeta_lo * key_mask_0
+    key_word_1_lo = key_zeta_lo * key_mask_1
+    key_word_2_lo = key_zeta_lo * key_mask_2
+    key_word_3_lo = key_zeta_lo * key_mask_3    
+    
+    # 1. 키 암호화
+    enc_key_word_hi_0 = engine.encrypt(key_word_0_hi, public_key)
+    enc_key_word_lo_0 = engine.encrypt(key_word_0_lo, public_key)
+    
+    enc_key_word_hi_1 = engine.encrypt(key_word_1_hi, public_key)
+    enc_key_word_lo_1 = engine.encrypt(key_word_1_lo, public_key)
+    
+    enc_key_word_hi_2 = engine.encrypt(key_word_2_hi, public_key)
+    enc_key_word_lo_2 = engine.encrypt(key_word_2_lo, public_key)
+    
+    enc_key_word_hi_3 = engine.encrypt(key_word_3_hi, public_key)
+    enc_key_word_lo_3 = engine.encrypt(key_word_3_lo, public_key)
+    
+    
+    enc_key_word_hi_list = [enc_key_word_hi_0, enc_key_word_hi_1, enc_key_word_hi_2, enc_key_word_hi_3]
+    enc_key_word_lo_list = [enc_key_word_lo_0, enc_key_word_lo_1, enc_key_word_lo_2, enc_key_word_lo_3]
+    
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
     # --- key Scheduling stage -------------------------------------------------
-    key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_hi, enc_key_lo)
+    key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_word_hi_list, enc_key_word_lo_list)
     
     # --- Encryption stage ----------------------------------------------------
     # 대충 암호화 하는 과정
@@ -309,8 +335,100 @@ if __name__ == "__main__":
     
     enc_data_hi_round_2, enc_data_lo_round_2 = inverse_sub_bytes(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     
+    # --- Round 2 --------------------------------------------------------------
+    enc_data_hi_round_2 = AddRoundKey(enc_data_hi_round_2, key_hi_list[2])
+    enc_data_lo_round_2 = AddRoundKey(enc_data_lo_round_2, key_lo_list[2])
+    
+    enc_data_hi_round_2, enc_data_lo_round_2 = inverse_mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    
+    enc_data_hi_round_2, enc_data_lo_round_2 = inverse_shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    
+    enc_data_hi_round_3, enc_data_lo_round_3 = inverse_sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    
+    # --- Round 3 --------------------------------------------------------------
+    enc_data_hi_round_3 = AddRoundKey(enc_data_hi_round_3, key_hi_list[3])
+    enc_data_lo_round_3 = AddRoundKey(enc_data_lo_round_3, key_lo_list[3])
+    
+    enc_data_hi_round_3, enc_data_lo_round_3 = inverse_mix_columns(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    
+    enc_data_hi_round_3, enc_data_lo_round_3 = inverse_shift_rows(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    
+    enc_data_hi_round_4, enc_data_lo_round_4 = inverse_sub_bytes(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    
+    # --- Round 4 --------------------------------------------------------------
+    enc_data_hi_round_4 = AddRoundKey(enc_data_hi_round_4, key_hi_list[4])
+    enc_data_lo_round_4 = AddRoundKey(enc_data_lo_round_4, key_lo_list[4])
+    
+    enc_data_hi_round_4, enc_data_lo_round_4 = inverse_mix_columns(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    
+    enc_data_hi_round_4, enc_data_lo_round_4 = inverse_shift_rows(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    
+    enc_data_hi_round_5, enc_data_lo_round_5 = inverse_sub_bytes(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    
+    # --- Round 5 --------------------------------------------------------------
+    enc_data_hi_round_5 = AddRoundKey(enc_data_hi_round_5, key_hi_list[5])
+    enc_data_lo_round_5 = AddRoundKey(enc_data_lo_round_5, key_lo_list[5])
+    
+    enc_data_hi_round_5, enc_data_lo_round_5 = inverse_mix_columns(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    
+    enc_data_hi_round_5, enc_data_lo_round_5 = inverse_shift_rows(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    
+    enc_data_hi_round_6, enc_data_lo_round_6 = inverse_sub_bytes(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    
+    # --- Round 6 --------------------------------------------------------------
+    enc_data_hi_round_6 = AddRoundKey(enc_data_hi_round_6, key_hi_list[6])
+    enc_data_lo_round_6 = AddRoundKey(enc_data_lo_round_6, key_lo_list[6])
+    
+    enc_data_hi_round_6, enc_data_lo_round_6 = inverse_mix_columns(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    
+    enc_data_hi_round_6, enc_data_lo_round_6 = inverse_shift_rows(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    
+    enc_data_hi_round_7, enc_data_lo_round_7 = inverse_sub_bytes(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    
+    # --- Round 7 --------------------------------------------------------------
+    enc_data_hi_round_7 = AddRoundKey(enc_data_hi_round_7, key_hi_list[7])
+    enc_data_lo_round_7 = AddRoundKey(enc_data_lo_round_7, key_lo_list[7])
+    
+    enc_data_hi_round_7, enc_data_lo_round_7 = inverse_mix_columns(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    
+    enc_data_hi_round_7, enc_data_lo_round_7 = inverse_shift_rows(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    
+    enc_data_hi_round_8, enc_data_lo_round_8 = inverse_sub_bytes(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    
+    # --- Round 8 --------------------------------------------------------------
+    enc_data_hi_round_8 = AddRoundKey(enc_data_hi_round_8, key_hi_list[8])
+    enc_data_lo_round_8 = AddRoundKey(enc_data_lo_round_8, key_lo_list[8])
+    
+    enc_data_hi_round_8, enc_data_lo_round_8 = inverse_mix_columns(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    
+    enc_data_hi_round_8, enc_data_lo_round_8 = inverse_shift_rows(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    
+    enc_data_hi_round_9, enc_data_lo_round_9 = inverse_sub_bytes(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    
+    # --- Round 9 --------------------------------------------------------------
+    enc_data_hi_round_9 = AddRoundKey(enc_data_hi_round_9, key_hi_list[9])
+    enc_data_lo_round_9 = AddRoundKey(enc_data_lo_round_9, key_lo_list[9])
+    
+    enc_data_hi_round_9, enc_data_lo_round_9 = inverse_mix_columns(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    
+    enc_data_hi_round_9, enc_data_lo_round_9 = inverse_shift_rows(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    
+    enc_data_hi_round_10, enc_data_lo_round_10 = inverse_sub_bytes(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    
+    # --- Round 10 --------------------------------------------------------------
+    enc_data_hi_round_10 = AddRoundKey(enc_data_hi_round_10, key_hi_list[10])
+    enc_data_lo_round_10 = AddRoundKey(enc_data_lo_round_10, key_lo_list[10])
+    
+    dec_data_hi = engine.decrypt(enc_data_hi_round_10, engine_context.get_secret_key())
+    dec_data_lo = engine.decrypt(enc_data_lo_round_10, engine_context.get_secret_key())
+    
+    dec_data_hi_int = zeta_to_int(dec_data_hi)
+    dec_data_lo_int = zeta_to_int(dec_data_lo)
+    
+    print(dec_data_hi_int)
+    print(dec_data_lo_int)
+
     
     
-    
-    
+
     
