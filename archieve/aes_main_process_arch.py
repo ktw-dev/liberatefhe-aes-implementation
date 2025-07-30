@@ -32,17 +32,9 @@ from aes_key_array import key_to_flat_array
 from aes_transform_zeta import int_to_zeta, zeta_to_int
 from aes_xor import _xor_operation
 from aes_key_scheduling import key_scheduling
-from key_scheduling_numpy import key_expansion_flat_nibbles
-
-# operation modules
-from aes_inv_SubBytes import inv_sub_bytes as _inv_sub_bytes
-from aes_inv_ShiftRows import inv_shift_rows as _inv_shift_rows
-from aes_inv_MixColumns import inv_mix_columns as _inv_mix_columns
-from aes_SubBytes import sub_bytes as _sub_bytes
-from aes_ShiftRows import shift_rows as _shift_rows
-from aes_MixColumns import mix_columns as _mix_columns
-
-
+from aes_inv_SubBytes import inverse_sub_bytes
+from aes_inv_ShiftRows import inverse_shift_rows
+from aes_inv_MixColumns import inverse_mix_columns
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers -------------------------------------------------------
@@ -246,7 +238,7 @@ if __name__ == "__main__":
     wait_next_stage("Data initiation", "key initiation")
 
     # --- Key initiation stage -------------------------------------------------
-    key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
+    key_bytes, key_flat, _, _, key_zeta_hi, key_zeta_lo = key_initiation()
 
     # DEBUG
     # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
@@ -265,61 +257,54 @@ if __name__ == "__main__":
     # DEBUG
     # print(enc_data_hi)
     # print(enc_data_lo)
+
+    
+    # # --- key HE-encryption stage ------------------------------------------------
+    
+    # # 키 마스킹
+    # key_mask_0 = np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)])
+    # key_mask_1 = np.concatenate([np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)])
+    # key_mask_2 = np.concatenate([np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)])
+    # key_mask_3 = np.concatenate([np.zeros(12 * 2048), np.ones(4 * 2048)])
+    
+    # key_word_0_hi = key_zeta_hi * key_mask_0
+    # key_word_1_hi = key_zeta_hi * key_mask_1
+    # key_word_2_hi = key_zeta_hi * key_mask_2
+    # key_word_3_hi = key_zeta_hi * key_mask_3
+    
+    # key_word_0_lo = key_zeta_lo * key_mask_0
+    # key_word_1_lo = key_zeta_lo * key_mask_1
+    # key_word_2_lo = key_zeta_lo * key_mask_2
+    # key_word_3_lo = key_zeta_lo * key_mask_3    
+    
+    # # 1. 키 암호화
+    # enc_key_word_hi_0 = engine.encrypt(key_word_0_hi, public_key)
+    # enc_key_word_lo_0 = engine.encrypt(key_word_0_lo, public_key)
+    
+    # enc_key_word_hi_1 = engine.encrypt(key_word_1_hi, public_key)
+    # enc_key_word_lo_1 = engine.encrypt(key_word_1_lo, public_key)
+    
+    # enc_key_word_hi_2 = engine.encrypt(key_word_2_hi, public_key)
+    # enc_key_word_lo_2 = engine.encrypt(key_word_2_lo, public_key)
+    
+    # enc_key_word_hi_3 = engine.encrypt(key_word_3_hi, public_key)
+    # enc_key_word_lo_3 = engine.encrypt(key_word_3_lo, public_key)
+    
+    
+    # enc_key_word_hi_list = [enc_key_word_hi_0, enc_key_word_hi_1, enc_key_word_hi_2, enc_key_word_hi_3]
+    # enc_key_word_lo_list = [enc_key_word_lo_0, enc_key_word_lo_1, enc_key_word_lo_2, enc_key_word_lo_3]
+    
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
     # --- key Scheduling stage -------------------------------------------------
     # key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_word_hi_list, enc_key_word_lo_list)
-    key_hi_list, key_lo_list = key_expansion_flat_nibbles(key_upper, key_lower)
-
-    # print(len(key_hi_list)) # 11
-    # print(len(key_lo_list)) # 11
     
-    # === 특수 목적 코드 ===
-    # 리스트 내 모든 키 암호화
-    enc_key_hi_list = []
-    enc_key_lo_list = []
-    for i in range(len(key_hi_list)):
-        enc_key_hi_list.append(engine.encrypt(key_hi_list[i], public_key))
-        enc_key_lo_list.append(engine.encrypt(key_lo_list[i], public_key))
-    
-    # print(enc_key_hi_list) # Complete!!
-    # print(enc_key_lo_list) # Complete!!
-    
-    # ========================================================================
-    # === Encryption stage ===================================================
-    # ========================================================================
-
-    # --- Round 0 --------------------------------------------------------------
-    enc_data_hi_round_0 = AddRoundKey(enc_data_hi, enc_key_hi_list[0])
-    enc_data_lo_round_0 = AddRoundKey(enc_data_lo, enc_key_lo_list[0])
-    
-    enc_data_hi_round_0, enc_data_lo_round_0 = shift_rows(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
-    
-    enc_data_hi_round_0, enc_data_lo_round_0 = sub_bytes(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
-    
-    
-    
-    
-    
-    
+    # --- Encryption stage ----------------------------------------------------
     # 대충 암호화 하는 과정
     enc_data_hi = None
     enc_data_lo = None
     wait_next_stage("encryption stage", "decryption stage")
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     # --- Decryption stage ----------------------------------------------------
     

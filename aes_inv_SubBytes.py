@@ -115,7 +115,7 @@ def inv_sbox_poly(ctx: CKKS_EngineContext, ct_hi_zeta: Any, ct_lo_zeta: Any) -> 
 # ----------------------------------------------------------------------
 # 4. 외부 공개 API
 # ----------------------------------------------------------------------
-def inverse_sub_bytes(ctx: CKKS_EngineContext, ct_hi_zeta: Any, ct_lo_zeta: Any):
+def inv_sub_bytes(ctx: CKKS_EngineContext, ct_hi_zeta: Any, ct_lo_zeta: Any):
     """Public API: aes_SubBytes와 동일한 시그니처를 가집니다."""
     return inv_sbox_poly(ctx, ct_hi_zeta, ct_lo_zeta)
 
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     # 2. Evaluate SubBytes operation
     start_time = time.time()
     print("sub_bytes.level: ", enc_alpha.level)
-    sub_bytes_hi, sub_bytes_lo = inverse_sub_bytes(engine_context, enc_alpha, enc_beta)
+    sub_bytes_hi, sub_bytes_lo = inv_sub_bytes(engine_context, enc_alpha, enc_beta)
     end_time = time.time()
     print(f"SubBytes time taken: {end_time - start_time} seconds")
     print("sub_bytes_hi.level: ", sub_bytes_hi.level)

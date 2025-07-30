@@ -170,6 +170,11 @@ for z in zeta_added_c[:16]:
     zeta_added_2_int.append(angle_to_int(z))
 
 print(zeta_added_2_int)
-print(ints_a + ints_b)
+print(f"ints_a + ints_b: {ints_a + ints_b}")
+print(f"ints_a ^ ints_b: {ints_a ^ ints_b}")
+print(f"zeta_added_2_int: {zeta_added_2_int}")
+print(f"zeta_added_2_int % 16: {zeta_added_2_int % 16}")
+print(f"ints_a + ints_b % 16: {(ints_a + ints_b) % 16}")
+print(f"ints_a ^ ints_b % 16: {(ints_a ^ ints_b) % 16}")
 
 print("결론: zeta 위상에서의 합은 정수 연산과 그 어떤 관계도 없다.")
