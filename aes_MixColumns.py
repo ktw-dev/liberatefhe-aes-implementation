@@ -151,27 +151,18 @@ if __name__ == "__main__":
     def mix_columns_numpy(arr: np.ndarray) -> np.ndarray:
         a = np.asarray(arr, dtype=np.uint8)
         st = a.copy()
-        
         def xtime(x):
-            x = x.astype(np.uint16)
             return (((x << 1) & 0xFF) ^ (((x >> 7) & 1) * 0x1B)).astype(np.uint8)
+        s0, s1, s2, s3 = st[:, 0], st[:, 1], st[:, 2], st[:, 3]
+        tmp = s0 ^ s1 ^ s2 ^ s3   
+        t0 = xtime(s0 ^ s1) ^ tmp ^ s0
+        t1 = xtime(s1 ^ s2) ^ tmp ^ s1
+        t2 = xtime(s2 ^ s3) ^ tmp ^ s2
+        t3 = xtime(s3 ^ s0) ^ tmp ^ s3
 
-        # 각 컬럼별로 처리
-        for col in range(4):
-            s0 = st[:, 0, col]  # [102, 220, ...] shape (2048,)
-            s1 = st[:, 1, col]  # [132, 116, ...] shape (2048,)
-            s2 = st[:, 2, col]  # [73, 219, ...]  shape (2048,)
-            s3 = st[:, 3, col]  # [181, 197, ...] shape (2048,)
-            
-            tmp = s0 ^ s1 ^ s2 ^ s3
-            
-            st[:, 0, col] = xtime(s0 ^ s1) ^ tmp ^ s0
-            st[:, 1, col] = xtime(s1 ^ s2) ^ tmp ^ s1
-            st[:, 2, col] = xtime(s2 ^ s3) ^ tmp ^ s2
-            st[:, 3, col] = xtime(s3 ^ s0) ^ tmp ^ s3
-        
-        return st
-        
+        mixed = np.stack([t0, t1, t2, t3], axis=1).astype(np.uint8)
+        return mixed       
+
     numpy_result = mix_columns_numpy(int_2d_array)
     
     
@@ -205,9 +196,38 @@ if __name__ == "__main__":
     print(numpy_result[0, :, :])
 
     decoded_int = decoded_int_hi << 4 | decoded_int_lo
+
+    # helper: return indices of k-th AES state inside flat vector (column-major layout)
+    def state_indices(k: int) -> np.ndarray:
+        base = k
+        # positions are (col*4 + row) * 2048 + k
+        offs = np.array([
+            0,  1,  2,  3,
+            4,  5,  6,  7,
+            8,  9, 10, 11,
+            12, 13, 14, 15
+        ]) * 2048
+        return base + offs
+
+    idx0 = state_indices(0)  # first state
+    decoded_first = decoded_int[idx0]
+
+    print("decoded first state:", decoded_first)
+    print("numpy first state  :", numpy_result[0].reshape(-1))
+    print("match mask         :", numpy_result[0].reshape(-1) == decoded_first)
     
-    print(decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048])
     
-    decoded_int_first_block = np.array([decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048]])
+    idx0 = state_indices(1)  # first state
+    decoded_first = decoded_int[idx0]
+
+    print("decoded first state:", decoded_first)
+    print("numpy first state  :", numpy_result[1].reshape(-1))
+    print("match mask         :", numpy_result[1].reshape(-1) == decoded_first)
     
-    print(numpy_result[0, :, :].reshape(-1) == decoded_int_first_block)
+    
+    idx0 = state_indices(2)  # first state
+    decoded_first = decoded_int[idx0]
+
+    print("decoded first state:", decoded_first)
+    print("numpy first state  :", numpy_result[2].reshape(-1))
+    print("match mask         :", numpy_result[2].reshape(-1) == decoded_first)
