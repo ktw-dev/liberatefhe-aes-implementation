@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 from engine_context import CKKS_EngineContext
 from typing import Any
-from aes_gf_mult import gf_mul_2, gf_mul_3
+from aes_gf_mult import gf_mult_2, gf_mult_3
 from aes_xor import _xor_operation
 
 __all__ = [
@@ -51,37 +51,37 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     """
     engine = engine_context.get_engine()
     
-    fixed_rotation_key_neg_4_2048 = engine_context.get_fixed_rotation_key(-4 * 2048)
-    fixed_rotation_key_4_2048 = engine_context.get_fixed_rotation_key(4 * 2048)
-    fixed_rotation_key_8_2048 = engine_context.get_fixed_rotation_key(8 * 2048)
+    fixed_rotation_key_neg_4_2048 = engine_context.get_fixed_rotation_key(12 * 2048)
+    fixed_rotation_key_neg_8_2048 = engine_context.get_fixed_rotation_key(8 * 2048)
+    fixed_rotation_key_neg_12_2048 = engine_context.get_fixed_rotation_key(4 * 2048)
     
-    list_of_fixed_rotation_keys = [fixed_rotation_key_neg_4_2048, fixed_rotation_key_8_2048, fixed_rotation_key_4_2048]
+    list_of_fixed_rotation_keys = [fixed_rotation_key_neg_4_2048, fixed_rotation_key_neg_8_2048, fixed_rotation_key_neg_12_2048]
     
     # ----------------------------------------------------------
     # -------------- 1. rotate 연산 ----------------------------
     # ----------------------------------------------------------
     # ct_hi 암호문 3개 생성    
     # 각각 -4, 8, 4 만큼 회전한 암호문 3개 생성
-    ct_hi_rot_list = engine.rotate_batch(ct_hi, list_of_fixed_rotation_keys)
+    ct_hi_rot_list = [engine.rotate(ct_hi, fixed_rotation_key_neg_4_2048), engine.rotate(ct_hi, fixed_rotation_key_neg_8_2048), engine.rotate(ct_hi, fixed_rotation_key_neg_12_2048)]
     
     # ct_lo 암호문 3개 생성    
     # 각각 -4, 8, 4 만큼 회전한 암호문 3개 생성
-    ct_lo_rot_list = engine.rotate_batch(ct_lo, list_of_fixed_rotation_keys)
+    ct_lo_rot_list = [engine.rotate(ct_lo, fixed_rotation_key_neg_4_2048), engine.rotate(ct_lo, fixed_rotation_key_neg_8_2048), engine.rotate(ct_lo, fixed_rotation_key_neg_12_2048)]
     
     # ----------------------------------------------------------
     # -------------- 2. variable naming convention --------------
     # ----------------------------------------------------------
     # gf_mul_2 연산을 오리지널 암호문에 대해 수행: level 5 소모 
-    one_ct_hi, one_ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)    
+    one_ct_hi, one_ct_lo = gf_mult_2(engine_context, ct_hi, ct_lo)    
     
     # gf_mul_3 연산을 -4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행: level 5 소모
-    two_ct_hi, two_ct_lo = gf_mul_3(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
+    two_ct_hi, two_ct_lo = gf_mult_3(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
     
-    three_ct_hi = ct_hi_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
-    three_ct_lo = ct_lo_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
+    three_ct_hi = ct_hi_rot_list[1] # -8 * 2048 만큼 왼쪽으로 회전한 암호문
+    three_ct_lo = ct_lo_rot_list[1] # -8 * 2048 만큼 왼쪽으로 회전한 암호문
     
-    four_ct_hi = ct_hi_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
-    four_ct_lo = ct_lo_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
+    four_ct_hi = ct_hi_rot_list[2] # -12 * 2048 만큼 왼쪽으로 회전한 암호문
+    four_ct_lo = ct_lo_rot_list[2] # -12 * 2048 만큼 왼쪽으로 회전한 암호문
     
 
     # -------------------------------------------------------
@@ -123,7 +123,7 @@ import time
 from aes_split_to_nibble import split_to_nibbles
 
 if __name__ == "__main__":
-    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=8, device_id=0)
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
     engine = engine_context.engine
     public_key = engine_context.public_key
     secret_key = engine_context.secret_key
@@ -149,27 +149,28 @@ if __name__ == "__main__":
 
     
     def mix_columns_numpy(arr: np.ndarray) -> np.ndarray:
-        """
-        NumPy-only MixColumns.
-        arr.dtype must be uint8 and total length a multiple of 16 (4-byte columns).
-        """
         a = np.asarray(arr, dtype=np.uint8)
         st = a.copy()
-        # xtime(x) = (x<<1) ^ 0x1B  if MSB=1  (finite-field ×2)
+        
         def xtime(x):
-            x = x.astype(np.uint16)              # avoid overflow
+            x = x.astype(np.uint16)
             return (((x << 1) & 0xFF) ^ (((x >> 7) & 1) * 0x1B)).astype(np.uint8)
 
-        s0, s1, s2, s3 = st[:, 0], st[:, 1], st[:, 2], st[:, 3]
-        tmp = s0 ^ s1 ^ s2 ^ s3                 # common term
-
-        t0 = xtime(s0 ^ s1) ^ tmp ^ s0
-        t1 = xtime(s1 ^ s2) ^ tmp ^ s1
-        t2 = xtime(s2 ^ s3) ^ tmp ^ s2
-        t3 = xtime(s3 ^ s0) ^ tmp ^ s3
-
-        mixed = np.stack([t0, t1, t2, t3], axis=1).astype(np.uint8)
-        return mixed
+        # 각 컬럼별로 처리
+        for col in range(4):
+            s0 = st[:, 0, col]  # [102, 220, ...] shape (2048,)
+            s1 = st[:, 1, col]  # [132, 116, ...] shape (2048,)
+            s2 = st[:, 2, col]  # [73, 219, ...]  shape (2048,)
+            s3 = st[:, 3, col]  # [181, 197, ...] shape (2048,)
+            
+            tmp = s0 ^ s1 ^ s2 ^ s3
+            
+            st[:, 0, col] = xtime(s0 ^ s1) ^ tmp ^ s0
+            st[:, 1, col] = xtime(s1 ^ s2) ^ tmp ^ s1
+            st[:, 2, col] = xtime(s2 ^ s3) ^ tmp ^ s2
+            st[:, 3, col] = xtime(s3 ^ s0) ^ tmp ^ s3
+        
+        return st
         
     numpy_result = mix_columns_numpy(int_2d_array)
     
@@ -208,4 +209,5 @@ if __name__ == "__main__":
     print(decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048])
     
     decoded_int_first_block = np.array([decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048]])
-    print(numpy_result[0, :, :] == decoded_int_first_block)
+    
+    print(numpy_result[0, :, :].reshape(-1) == decoded_int_first_block)

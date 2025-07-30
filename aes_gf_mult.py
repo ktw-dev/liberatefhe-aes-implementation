@@ -46,7 +46,6 @@ def _load_coeff(mult_val: int, which: str):
 
 # Pre-load coefficient dictionaries for fast access
 _COEFFS: Dict[Tuple[int, str], Dict[Tuple[int, int], complex]] = {}
-
 for _m in _MULTS_WITH_TABLE:
     _COEFFS[(_m, "hi")] = _load_coeff(_m, "hi")
     _COEFFS[(_m, "lo")] = _load_coeff(_m, "lo")
@@ -113,12 +112,12 @@ def _poly_eval(
 
 # Exported symbols
 __all__ = [
-    "gf_mul_2",
-    "gf_mul_3",
-    "gf_mul_9",
-    "gf_mul_11",
-    "gf_mul_13",
-    "gf_mul_14",
+    "gf_mult_2",
+    "gf_mult_3",
+    "gf_mult_9",
+    "gf_mult_11",
+    "gf_mult_13",
+    "gf_mult_14",
 ]
 
 
@@ -136,27 +135,27 @@ def _gf_mul_generic(mult_val: int, context: CKKS_EngineContext, ct_hi: Any, ct_l
 # Concrete wrappers -----------------------------------------------------------
 
 
-def gf_mul_2(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def gf_mult_2(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return _gf_mul_generic(2, context, ct_hi, ct_lo)
 
 
-def gf_mul_3(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def gf_mult_3(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return _gf_mul_generic(3, context, ct_hi, ct_lo)
 
 
-def gf_mul_9(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def gf_mult_9(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return _gf_mul_generic(9, context, ct_hi, ct_lo)
 
 
-def gf_mul_11(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def gf_mult_11(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return _gf_mul_generic(11, context, ct_hi, ct_lo)
 
 
-def gf_mul_13(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def gf_mult_13(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return _gf_mul_generic(13, context, ct_hi, ct_lo)
 
 
-def gf_mul_14(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def gf_mult_14(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     return _gf_mul_generic(14, context, ct_hi, ct_lo)
 
 
@@ -165,7 +164,7 @@ def gf_mul_14(context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
 # -----------------------------------------------------------------------------
 
 
-gf_mult_2 = np.array([
+gf_mult_2_table = np.array([
     0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e, 0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
     0x20, 0x22, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2e, 0x30, 0x32, 0x34, 0x36, 0x38, 0x3a, 0x3c, 0x3e,
     0x40, 0x42, 0x44, 0x46, 0x48, 0x4a, 0x4c, 0x4e, 0x50, 0x52, 0x54, 0x56, 0x58, 0x5a, 0x5c, 0x5e,
@@ -184,7 +183,7 @@ gf_mult_2 = np.array([
     0xfb, 0xf9, 0xff, 0xfd, 0xf3, 0xf1, 0xf7, 0xf5, 0xeb, 0xe9, 0xef, 0xed, 0xe3, 0xe1, 0xe7, 0xe5
 ], dtype=np.uint8)
 
-gf_mult_3 = np.array([
+gf_mult_3_table = np.array([
     0x00,0x03,0x06,0x05,0x0c,0x0f,0x0a,0x09,0x18,0x1b,0x1e,0x1d,0x14,0x17,0x12,0x11,
     0x30,0x33,0x36,0x35,0x3c,0x3f,0x3a,0x39,0x28,0x2b,0x2e,0x2d,0x24,0x27,0x22,0x21,
     0x60,0x63,0x66,0x65,0x6c,0x6f,0x6a,0x69,0x78,0x7b,0x7e,0x7d,0x74,0x77,0x72,0x71,
@@ -203,7 +202,7 @@ gf_mult_3 = np.array([
     0x0b,0x08,0x0d,0x0e,0x07,0x04,0x01,0x02,0x13,0x10,0x15,0x16,0x1f,0x1c,0x19,0x1a
 ], dtype=np.uint8)
     
-gf_mult_9 = np.array([
+gf_mult_9_table = np.array([
     0x00,0x09,0x12,0x1b,0x24,0x2d,0x36,0x3f,0x48,0x41,0x5a,0x53,0x6c,0x65,0x7e,0x77,
     0x90,0x99,0x82,0x8b,0xb4,0xbd,0xa6,0xaf,0xd8,0xd1,0xca,0xc3,0xfc,0xf5,0xee,0xe7,
     0x3b,0x32,0x29,0x20,0x1f,0x16,0x0d,0x04,0x73,0x7a,0x61,0x68,0x57,0x5e,0x45,0x4c,
@@ -222,7 +221,7 @@ gf_mult_9 = np.array([
     0x31,0x38,0x23,0x2a,0x15,0x1c,0x07,0x0e,0x79,0x70,0x6b,0x62,0x5d,0x54,0x4f,0x46
 ], dtype=np.uint8)
 
-gf_mult_11 = np.array([
+gf_mult_11_table = np.array([
     0x00,0x0b,0x16,0x1d,0x2c,0x27,0x3a,0x31,0x58,0x53,0x4e,0x45,0x74,0x7f,0x62,0x69,
     0xb0,0xbb,0xa6,0xad,0x9c,0x97,0x8a,0x81,0xe8,0xe3,0xfe,0xf5,0xc4,0xcf,0xd2,0xd9,
     0x7b,0x70,0x6d,0x66,0x57,0x5c,0x41,0x4a,0x23,0x28,0x35,0x3e,0x0f,0x04,0x19,0x12,
@@ -241,7 +240,7 @@ gf_mult_11 = np.array([
     0xca,0xc1,0xdc,0xd7,0xe6,0xed,0xf0,0xfb,0x92,0x99,0x84,0x8f,0xbe,0xb5,0xa8,0xa3
 ], dtype=np.uint8)
 
-gf_mult_13 = np.array([
+gf_mult_13_table = np.array([
     0x00,0x0d,0x1a,0x17,0x34,0x39,0x2e,0x23,0x68,0x65,0x72,0x7f,0x5c,0x51,0x46,0x4b,
     0xd0,0xdd,0xca,0xc7,0xe4,0xe9,0xfe,0xf3,0xb8,0xb5,0xa2,0xaf,0x8c,0x81,0x96,0x9b,
     0xbb,0xb6,0xa1,0xac,0x8f,0x82,0x95,0x98,0xd3,0xde,0xc9,0xc4,0xe7,0xea,0xfd,0xf0,
@@ -260,7 +259,7 @@ gf_mult_13 = np.array([
     0xdc,0xd1,0xc6,0xcb,0xe8,0xe5,0xf2,0xff,0xb4,0xb9,0xae,0xa3,0x80,0x8d,0x9a,0x97
 ], dtype=np.uint8)
 
-gf_mult_14 = np.array([
+gf_mult_14_table = np.array([
     0x00,0x0e,0x1c,0x12,0x38,0x36,0x24,0x2a,0x70,0x7e,0x6c,0x62,0x48,0x46,0x54,0x5a,
     0xe0,0xee,0xfc,0xf2,0xd8,0xd6,0xc4,0xca,0x90,0x9e,0x8c,0x82,0xa8,0xa6,0xb4,0xba,
     0xdb,0xd5,0xc7,0xc9,0xe3,0xed,0xff,0xf1,0xab,0xa5,0xb7,0xb9,0x93,0x9d,0x8f,0x81,
@@ -285,12 +284,12 @@ gf_mult_14 = np.array([
 
 # Map each multiplier to its pre-computed numpy table.
 _GF_MULT_TABLES = {
-    2: gf_mult_2,
-    3: gf_mult_3,
-    9: gf_mult_9,
-    11: gf_mult_11,
-    13: gf_mult_13,
-    14: gf_mult_14,
+    2: gf_mult_2_table,
+    3: gf_mult_3_table,
+    9: gf_mult_9_table,
+    11: gf_mult_11_table,
+    13: gf_mult_13_table,
+    14: gf_mult_14_table,
 }
 
 
@@ -376,34 +375,34 @@ if __name__ == "__main__":
     
     # gf mult 2,3,9,11,13,14의 다항식 연산 및 각각의 시간 측정
     start_time = time.time()
-    gf_mul_2_alpha, gf_mul_2_beta = gf_mul_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    gf_mul_2_alpha, gf_mul_2_beta = gf_mult_2(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
     print(f"gf_mul_2 작동 시간: {end_time - start_time}초")
     print(f"gf mult 2 작동 후 level: {gf_mul_2_alpha.level}")
     
     start_time = time.time()
-    gf_mul_3_alpha, gf_mul_3_beta = gf_mul_3(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    gf_mul_3_alpha, gf_mul_3_beta = gf_mult_3(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
     print(f"gf_mul_3 작동 시간: {end_time - start_time}초")
     print(f"gf mult 3 작동 후 level: {gf_mul_3_alpha.level}")
     
     start_time = time.time()
-    gf_mul_9_alpha, gf_mul_9_beta = gf_mul_9(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    gf_mul_9_alpha, gf_mul_9_beta = gf_mult_9(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
     print(f"gf_mul_9 작동 시간: {end_time - start_time}초")
     print(f"gf mult 9 작동 후 level: {gf_mul_9_alpha.level}")   
     start_time = time.time()
-    gf_mul_11_alpha, gf_mul_11_beta = gf_mul_11(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    gf_mul_11_alpha, gf_mul_11_beta = gf_mult_11(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
     print(f"gf_mul_11 작동 시간: {end_time - start_time}초")
     print(f"gf mult 11 작동 후 level: {gf_mul_11_alpha.level}")
     start_time = time.time()
-    gf_mul_13_alpha, gf_mul_13_beta = gf_mul_13(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    gf_mul_13_alpha, gf_mul_13_beta = gf_mult_13(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
     print(f"gf_mul_13 작동 시간: {end_time - start_time}초")
     print(f"gf mult 13 작동 후 level: {gf_mul_13_alpha.level}")
     start_time = time.time()
-    gf_mul_14_alpha, gf_mul_14_beta = gf_mul_14(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
+    gf_mul_14_alpha, gf_mul_14_beta = gf_mult_14(engine_context, enc_alpha_int_zeta, enc_beta_int_zeta)
     end_time = time.time()
     print(f"gf_mul_14 작동 시간: {end_time - start_time}초")
     print(f"gf mult 14 작동 후 level: {gf_mul_14_alpha.level}")

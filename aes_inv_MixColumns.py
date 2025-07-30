@@ -19,14 +19,14 @@ from __future__ import annotations
 import numpy as np
 from engine_context import CKKS_EngineContext
 from typing import Any
-from aes_gf_mult import gf_mul_9, gf_mul_11, gf_mul_13, gf_mul_14
+from aes_gf_mult import gf_mult_9, gf_mult_11, gf_mult_13, gf_mult_14
 from aes_xor import _xor_operation
 
 __all__ = [
-    "mix_columns",
+    "inv_mix_columns",
 ]
 
-def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
+def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     """두 개의 블록을 받아 inverse MixColumns 연산을 수행하고 결과를 반환   
     Args:
         engine_context: CKKS_EngineContext
@@ -53,10 +53,10 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     engine = engine_context.get_engine()
     
     fixed_rotation_key_neg_4_2048 = engine_context.get_fixed_rotation_key(-4 * 2048)
-    fixed_rotation_key_4_2048 = engine_context.get_fixed_rotation_key(4 * 2048)
-    fixed_rotation_key_8_2048 = engine_context.get_fixed_rotation_key(8 * 2048)
+    fixed_rotation_key_neg_8_2048 = engine_context.get_fixed_rotation_key(-8 * 2048)
+    fixed_rotation_key_neg_12_2048 = engine_context.get_fixed_rotation_key(-12 * 2048)
     
-    list_of_fixed_rotation_keys = [fixed_rotation_key_neg_4_2048, fixed_rotation_key_8_2048, fixed_rotation_key_4_2048]
+    list_of_fixed_rotation_keys = [fixed_rotation_key_neg_4_2048, fixed_rotation_key_neg_8_2048, fixed_rotation_key_neg_12_2048]
     
     # ----------------------------------------------------------
     # -------------- 1. rotate 연산 ----------------------------
@@ -73,16 +73,16 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # -------------- 2. variable naming convention --------------
     # ----------------------------------------------------------
     # gf_mul_2 연산을 오리지널 암호문에 대해 수행: level 5 소모 
-    one_ct_hi, one_ct_lo = gf_mul_2(engine_context, ct_hi, ct_lo)    
+    one_ct_hi, one_ct_lo = gf_mult_14(engine_context, ct_hi, ct_lo)    
     
     # gf_mul_3 연산을 4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행: level 10 소모
-    two_ct_hi, two_ct_lo = gf_mul_3(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
+    two_ct_hi, two_ct_lo = gf_mult_11(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
     
-    three_ct_hi = ct_hi_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
-    three_ct_lo = ct_lo_rot_list[1] # 8 * 2048 만큼 오른쪽으로 회전한 암호문
+    three_ct_hi, three_ct_lo = gf_mult_13(engine_context, ct_hi_rot_list[1], ct_lo_rot_list[1]) # -8 * 2048 만큼 왼쪽으로 회전한 암호문
     
-    four_ct_hi = ct_hi_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
-    four_ct_lo = ct_lo_rot_list[2] # 4 * 2048 만큼 오른쪽으로 회전한 암호문
+    
+    four_ct_hi, four_ct_lo = gf_mult_9(engine_context, ct_hi_rot_list[2], ct_lo_rot_list[2]) # -12 * 2048 만큼 왼쪽으로 회전한 암호문
+    
     
     # -------------------------------------------------------
     # ------------------ 3. Bootstrap 연산 -------------------
@@ -131,9 +131,10 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
 
 from aes_transform_zeta import int_to_zeta, zeta_to_int
 import time
+from aes_split_to_nibble import split_to_nibbles
 
 if __name__ == "__main__":
-    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=16, device_id=0)
+    engine_context = CKKS_EngineContext(signature=1, use_bootstrap=True, mode="parallel", thread_count=8, device_id=0)
     engine = engine_context.engine
     public_key = engine_context.public_key
     secret_key = engine_context.secret_key
@@ -145,8 +146,70 @@ if __name__ == "__main__":
     
     # 1. Encrypt inputs
     np.random.seed(42)
-    alpha_int = np.random.randint(0, 16, size=32768, dtype=np.uint8)
-    beta_int  = np.random.randint(0, 16, size=32768, dtype=np.uint8)
+    int_array = np.random.randint(0, 255, size=32768, dtype=np.uint8)
+    
+    print(int_array.shape)
+    print(int_array[0], int_array[1 * 2048], int_array[2 * 2048], int_array[3 * 2048], int_array[4 * 2048], int_array[5 * 2048], int_array[6 * 2048], int_array[7 * 2048], int_array[8 * 2048], int_array[9 * 2048], int_array[10 * 2048], int_array[11 * 2048], int_array[12 * 2048], int_array[13 * 2048], int_array[14 * 2048], int_array[15 * 2048])
+    
+    print(int_array[1], int_array[1 * 2048 + 1], int_array[2 * 2048 + 1], int_array[3 * 2048 + 1], int_array[4 * 2048 + 1], int_array[5 * 2048 + 1], int_array[6 * 2048 + 1], int_array[7 * 2048 + 1], int_array[8 * 2048 + 1], int_array[9 * 2048 + 1], int_array[10 * 2048 + 1], int_array[11 * 2048 + 1], int_array[12 * 2048 + 1], int_array[13 * 2048 + 1], int_array[14 * 2048 + 1], int_array[15 * 2048 + 1])
+
+    int_2d_array = int_array.reshape(16, 2048).T.reshape(-1, 4, 4)    
+    print(int_2d_array.shape)
+    print(int_2d_array[0, :, :])
+    print(int_2d_array[1, :, :])
+
+    
+    def inv_mix_columns_numpy(arr: np.ndarray) -> np.ndarray:
+        """
+        NumPy-only Inverse MixColumns.
+        arr.dtype must be uint8 and total length a multiple of 16 (4-byte columns).
+        """
+        a = np.asarray(arr, dtype=np.uint8)
+        st = a.copy()
+        
+        # Use lookup tables for GF multiplication
+        from aes_gf_mult import gf_mult_lookup
+        
+        # Process each column (4 columns) vectorised over batch N
+         # mix_columns_numpy와 동일한 방식으로 분해
+        s0, s1, s2, s3 = st[:, 0], st[:, 1], st[:, 2], st[:, 3]
+
+        # 벡터화된 inverse MixColumns 적용
+        st[:, 0] = (
+            gf_mult_lookup(s0, 14) ^
+            gf_mult_lookup(s1, 11) ^
+            gf_mult_lookup(s2, 13) ^
+            gf_mult_lookup(s3, 9)
+        )
+        
+        st[:, 1] = (
+            gf_mult_lookup(s0, 9) ^
+            gf_mult_lookup(s1, 14) ^
+            gf_mult_lookup(s2, 11) ^
+            gf_mult_lookup(s3, 13)
+        )
+        
+        st[:, 2] = (
+            gf_mult_lookup(s0, 13) ^
+            gf_mult_lookup(s1, 9) ^
+            gf_mult_lookup(s2, 14) ^
+            gf_mult_lookup(s3, 11)
+        )
+        
+        st[:, 3] = (
+            gf_mult_lookup(s0, 11) ^
+            gf_mult_lookup(s1, 13) ^
+            gf_mult_lookup(s2, 9) ^
+            gf_mult_lookup(s3, 14)
+        )
+
+        return st
+        
+    numpy_result = inv_mix_columns_numpy(int_2d_array)
+    
+    
+    # hi/lo nibble로 분할
+    alpha_int, beta_int = split_to_nibbles(int_array)
 
     # Map to zeta domain
     alpha = int_to_zeta(alpha_int)
@@ -158,16 +221,25 @@ if __name__ == "__main__":
     print("mix_columns")
     # 2. Evaluate MixColumns operation
     start_time = time.time()
-    mixed_ct_hi, mixed_ct_lo = mix_columns(engine_context, enc_alpha, enc_beta)
+    mixed_ct_hi, mixed_ct_lo = inv_mix_columns(engine_context, enc_alpha, enc_beta)
     end_time = time.time()
     print(f"MixColumns time taken: {end_time - start_time} seconds")
 
     start_time = time.time()
     # 3. Decrypt result
     decoded_zeta = engine.decrypt(mixed_ct_hi, secret_key)
-    decoded_int = zeta_to_int(decoded_zeta)
+    decoded_int_hi = zeta_to_int(decoded_zeta)
     decoded_zeta_lo = engine.decrypt(mixed_ct_lo, secret_key)
     decoded_int_lo = zeta_to_int(decoded_zeta_lo)
     
-    print(decoded_int)
+    print(decoded_int_hi)
     print(decoded_int_lo)
+    
+    print(numpy_result[0, :, :])
+
+    decoded_int = decoded_int_hi << 4 | decoded_int_lo
+    
+    print(decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048])
+    
+    decoded_int_first_block = np.array([decoded_int[0],decoded_int[1*2048],decoded_int[2*2048],decoded_int[3*2048],decoded_int[4*2048],decoded_int[5*2048],decoded_int[6*2048],decoded_int[7*2048],decoded_int[8*2048],decoded_int[9*2048],decoded_int[10*2048],decoded_int[11*2048],decoded_int[12*2048],decoded_int[13*2048],decoded_int[14*2048],decoded_int[15*2048]])
+    print(numpy_result[0, :, :].reshape(-1) == decoded_int_first_block)
