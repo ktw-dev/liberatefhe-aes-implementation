@@ -261,10 +261,10 @@ def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     word_lo = []
     
     # ------------------------------Masking------------------------------
-    word_0_mask = np.concatenate(np.ones(4 * max_blocks), np.zeros(12 * max_blocks))
-    word_1_mask = np.concatenate(np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks))
-    word_2_mask = np.concatenate(np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks))
-    word_3_mask = np.concatenate(np.zeros(12 * max_blocks), np.ones(4 * max_blocks))
+    word_0_mask = np.concatenate((np.ones(4 * max_blocks), np.zeros(12 * max_blocks)))
+    word_1_mask = np.concatenate((np.zeros(4 * max_blocks), np.ones(4 * max_blocks), np.zeros(8 * max_blocks)))
+    word_2_mask = np.concatenate((np.zeros(8 * max_blocks), np.ones(4 * max_blocks), np.zeros(4 * max_blocks)))
+    word_3_mask = np.concatenate((np.zeros(12 * max_blocks), np.ones(4 * max_blocks)))
     
     word_0_mask_plain = engine.encode(word_0_mask)
     word_1_mask_plain = engine.encode(word_1_mask)
