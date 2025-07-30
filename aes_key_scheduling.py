@@ -306,15 +306,15 @@ if __name__ == "__main__":
     
     _, _, key_upper, key_lower, key_zeta_upper, key_zeta_lower = key_initiation()
     
-    enc_key_hi = engine.encrypt(key_zeta_upper, engine.get_public_key())
-    enc_key_lo = engine.encrypt(key_zeta_lower, engine.get_public_key())
+    enc_key_hi = engine.encrypt(key_zeta_upper, engine_context.get_public_key())
+    enc_key_lo = engine.encrypt(key_zeta_lower, engine_context.get_public_key())
     print(enc_key_hi)
     print(enc_key_lo)
     
     print(key_upper[12*2048], key_upper[13*2048], key_upper[14*2048], key_upper[15*2048])
     print(key_lower[12*2048], key_lower[13*2048], key_lower[14*2048], key_lower[15*2048])
     
-    rot_word_hi, rot_word_lo = _rot_word(engine_context, enc_key_hi, key_zeta_lower)
+    rot_word_hi, rot_word_lo = _rot_word(engine_context, enc_key_hi, enc_key_lo)
 
     decrypted_rot_word_hi = engine_context.decrypt(rot_word_hi)
     decrypted_rot_word_lo = engine_context.decrypt(rot_word_lo)
