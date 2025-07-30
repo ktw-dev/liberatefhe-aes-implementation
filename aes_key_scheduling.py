@@ -126,13 +126,13 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # ------------------------------Apply RotWord to hi bytes------------------------------
     # Move secondtofourth_bytes to positions 0,1,2 and first_bytes to position 3
     new_positions_131415 = engine.rotate(_141516_bytes_enc_hi, fixed_rotation_key_neg_2048)
-    new_position_16 = engine.fixed_rotate(_13_bytes_enc_hi, fixed_rotation_key_3_2048)
+    new_position_16 = engine.rotate(_13_bytes_enc_hi, fixed_rotation_key_3_2048)
 
     rotated_hi_bytes = engine.add(new_positions_131415, new_position_16)
     
     # ------------------------------Apply RotWord to lo bytes------------------------------
     new_positions_131415 = engine.rotate(_141516_bytes_enc_lo, fixed_rotation_key_neg_2048)
-    new_position_16 = engine.fixed_rotate(_13_bytes_enc_lo, fixed_rotation_key_3_2048)
+    new_position_16 = engine.rotate(_13_bytes_enc_lo, fixed_rotation_key_3_2048)
 
     # 나머지 자리는 자연스럽게 0으로 초기화된다.
     rotated_lo_bytes = engine.add(new_positions_131415, new_position_16)
