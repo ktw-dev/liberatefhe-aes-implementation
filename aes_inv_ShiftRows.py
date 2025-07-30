@@ -43,7 +43,7 @@ def _get_inv_shift_rows_masks(engine_context: "CKKS_EngineContext"):
     """
 
     # Fast-path: masks already cached on this context --------------------------------
-    if hasattr(engine_context, "_inv_shift_rows_masks"):
+    if hasattr(engine_context, "_inv_shift_rows_masks") and engine_context._inv_shift_rows_masks is not None:
         return engine_context._inv_shift_rows_masks  # type: ignore[attr-defined]
 
     engine = engine_context.engine
@@ -76,7 +76,8 @@ def _get_inv_shift_rows_masks(engine_context: "CKKS_EngineContext"):
 
 
     # ---------------------------- encode and cache ----------------------------------
-    masks = {
+    try:
+        masks = {
         "row_0": engine.encode(row_0_mask),
         # ---------------- Inverse ShiftRows masks -----------------
         # naming convention: rows_<rowIndex>_<segment description>
@@ -93,9 +94,14 @@ def _get_inv_shift_rows_masks(engine_context: "CKKS_EngineContext"):
         "rows_3_123": engine.encode(row_3_123_mask),
     }
 
-    # Persist on context for future reuse
-    engine_context._inv_shift_rows_masks = masks
-    return masks
+        # Persist on context for future reuse
+        engine_context._inv_shift_rows_masks = masks
+        return masks
+    except Exception as e:
+        print(f"Error in _get_inv_shift_rows_masks: {e}")
+        print(f"Engine slot count: {engine.slot_count}")
+        print(f"Mask length: {len(row_0_mask)}")
+        raise
 
 
 def inv_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
@@ -122,15 +128,15 @@ def inv_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     # Load / cache plaintext masks -------------------------------------------------
     # -----------------------------------------------------------------------------
-    _masks = _get_inv_shift_rows_masks(engine_context)
+    masks = _get_inv_shift_rows_masks(engine_context)
 
-    row_0_mask_plaintext = _masks["row_0"]
-    row_1_012_mask_plaintext = _masks["rows_1_012"]
-    row_1_3_mask_plaintext = _masks["rows_1_3"]
-    row_2_01_mask_plaintext = _masks["rows_2_01"]
-    row_2_23_mask_plaintext = _masks["rows_2_23"]
-    row_3_0_mask_plaintext = _masks["rows_3_0"]
-    row_3_123_mask_plaintext = _masks["rows_3_123"]
+    row_0_mask_plaintext = masks["row_0"]
+    row_1_012_mask_plaintext = masks["rows_1_012"]
+    row_1_3_mask_plaintext = masks["rows_1_3"]
+    row_2_01_mask_plaintext = masks["rows_2_01"]
+    row_2_23_mask_plaintext = masks["rows_2_23"]
+    row_3_0_mask_plaintext = masks["rows_3_0"]
+    row_3_123_mask_plaintext = masks["rows_3_123"]
     
     # -----------------------------------------------------------------------------
     # masking operation of High nibble
@@ -165,40 +171,42 @@ def inv_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
     # mask_row_1에 대해 0은 3 로 한번, 123은 -1로 한 번 회전
-    rotated_row_hi_1_012 = engine.rotate(masked_row_hi_1_012, fixed_rotation_key_list[5])
-    rotated_row_hi_1_3 = engine.rotate(masked_row_hi_1_3, fixed_rotation_key_list[2])
+    # inverse: rows_1_012 needs +1 (index 3), rows_1_3 needs -3 (index 0)
+    rotated_row_hi_1_012 = engine.rotate(masked_row_hi_1_012, fixed_rotation_key_list[3])  # +1*2048
+    rotated_row_hi_1_3 = engine.rotate(masked_row_hi_1_3, fixed_rotation_key_list[0])     # -3*2048
     
     # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
     rotated_row_hi_2_01 = engine.rotate(masked_row_hi_2_01, fixed_rotation_key_list[4])
     rotated_row_hi_2_23 = engine.rotate(masked_row_hi_2_23, fixed_rotation_key_list[1])
     
     # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
-    rotated_row_hi_3_0 = engine.rotate(masked_row_hi_3_0, fixed_rotation_key_list[3])
-    rotated_row_hi_3_123 = engine.rotate(masked_row_hi_3_123, fixed_rotation_key_list[0])
+    # inverse: row_3_0 needs +3 (index 5), row_3_123 needs -1 (index 2)
+    rotated_row_hi_3_0 = engine.rotate(masked_row_hi_3_0, fixed_rotation_key_list[5])      # +3*2048
+    rotated_row_hi_3_123 = engine.rotate(masked_row_hi_3_123, fixed_rotation_key_list[2])  # -1*2048
     
     # concatenate all the rotated rows
-    rotated_rows_hi_0 = engine.add(masked_row_hi_0, rotated_row_hi_1_0)
-    rotated_rows_hi_1 = engine.add(rotated_rows_hi_0, rotated_row_hi_1_012)
+    rotated_rows_hi_0 = engine.add(masked_row_hi_0, rotated_row_hi_1_012)
+    rotated_rows_hi_1 = engine.add(rotated_rows_hi_0, rotated_row_hi_1_3)
     rotated_rows_hi_2 = engine.add(rotated_rows_hi_1, rotated_row_hi_2_01)
     rotated_rows_hi_3 = engine.add(rotated_rows_hi_2, rotated_row_hi_2_23)
-    rotated_rows_hi_4 = engine.add(rotated_rows_hi_3, rotated_row_hi_3_0)
-    rotated_rows_hi = engine.add(rotated_rows_hi_4, rotated_row_hi_3_123)
+    rotated_rows_hi_4 = engine.add(rotated_rows_hi_3, rotated_row_hi_3_123)
+    rotated_rows_hi = engine.add(rotated_rows_hi_4, rotated_row_hi_3_0)
     
     # -----------------------------------------------------------------------------
     # rotate operation of Low nibble
     # -----------------------------------------------------------------------------
     # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
     # mask_row_1에 대해 012는 1로 한번, 3은 -3로 한 번 회전
-    rotated_row_lo_1_012 = engine.rotate(masked_row_lo_1_012, fixed_rotation_key_list[3])
-    rotated_row_lo_1_3 = engine.rotate(masked_row_lo_1_3, fixed_rotation_key_list[0])
+    rotated_row_lo_1_012 = engine.rotate(masked_row_lo_1_012, fixed_rotation_key_list[3])  # +1*2048
+    rotated_row_lo_1_3 = engine.rotate(masked_row_lo_1_3, fixed_rotation_key_list[0])      # -3*2048
     
     # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
     rotated_row_lo_2_01 = engine.rotate(masked_row_lo_2_01, fixed_rotation_key_list[4])
     rotated_row_lo_2_23 = engine.rotate(masked_row_lo_2_23, fixed_rotation_key_list[1])
     
     # mask_row_3에 대해 123는 -1로 한번, 0은 3로 한 번 회전
-    rotated_row_lo_3_0 = engine.rotate(masked_row_lo_3_0, fixed_rotation_key_list[5])
-    rotated_row_lo_3_123 = engine.rotate(masked_row_lo_3_123, fixed_rotation_key_list[2])
+    rotated_row_lo_3_0 = engine.rotate(masked_row_lo_3_0, fixed_rotation_key_list[5])       # +3*2048
+    rotated_row_lo_3_123 = engine.rotate(masked_row_lo_3_123, fixed_rotation_key_list[2])   # -1*2048
     
     # concatenate all the rotated rows
     rotated_rows_lo_0 = engine.add(masked_row_lo_0, rotated_row_lo_1_012)
@@ -208,8 +216,6 @@ def inv_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     rotated_rows_lo_4 = engine.add(rotated_rows_lo_3, rotated_row_lo_3_0)
     rotated_rows_lo = engine.add(rotated_rows_lo_4, rotated_row_lo_3_123)
     
-
-
     return rotated_rows_hi, rotated_rows_lo
 
 

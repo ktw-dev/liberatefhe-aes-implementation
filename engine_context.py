@@ -133,6 +133,8 @@ class CKKS_EngineContext:
         
         # ShiftRows masks
         self._shift_rows_masks: dict[str, "desilofhe.Plaintext"] | None = None
+        # Inverse ShiftRows masks
+        self._inv_shift_rows_masks: dict[str, "desilofhe.Plaintext"] | None = None
 
     # ---------------------------------------------------------------------
     # Representation helpers
