@@ -301,9 +301,13 @@ if __name__ == "__main__":
     from aes_main_process import engine_initiation, key_initiation
     from aes_transform_zeta import zeta_to_int
     engine_context = engine_initiation(signature=1)
+    
+    engine = engine_context.get_engine()
+    
     _, _, key_upper, key_lower, key_zeta_upper, key_zeta_lower = key_initiation()
     
-    enc_key_hi, enc_key_lo = key_scheduling(engine_context, key_zeta_upper, key_zeta_lower)
+    enc_key_hi = engine.encrypt(key_zeta_upper, engine.get_public_key())
+    enc_key_lo = engine.encrypt(key_zeta_lower, engine.get_public_key())
     print(enc_key_hi)
     print(enc_key_lo)
     
