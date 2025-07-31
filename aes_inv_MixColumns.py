@@ -72,14 +72,11 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # ----------------------------------------------------------
     # -------------- 2. variable naming convention --------------
     # ----------------------------------------------------------
-    # gf_mul_2 연산을 오리지널 암호문에 대해 수행: level 5 소모 
     one_ct_hi, one_ct_lo = gf_mult_14(engine_context, ct_hi, ct_lo)    
     
-    # gf_mul_3 연산을 4 * 2048 만큼 왼쪽으로 회전한 암호문에 대해 수행: level 10 소모
     two_ct_hi, two_ct_lo = gf_mult_11(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
     
     three_ct_hi, three_ct_lo = gf_mult_13(engine_context, ct_hi_rot_list[1], ct_lo_rot_list[1]) # -8 * 2048 만큼 왼쪽으로 회전한 암호문
-    
     
     four_ct_hi, four_ct_lo = gf_mult_9(engine_context, ct_hi_rot_list[2], ct_lo_rot_list[2]) # -12 * 2048 만큼 왼쪽으로 회전한 암호문
     

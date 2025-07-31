@@ -73,13 +73,13 @@ def _get_shift_rows_masks(engine_context: "CKKS_EngineContext"):
     # ---------------------------- encode and cache ----------------------------------
     try:
         masks = {
-            "row_0": engine.encode(row_0_mask),
-            "row_1_0": engine.encode(row_1_0_mask),
-            "row_2_01": engine.encode(row_2_01_mask),
-            "row_3_012": engine.encode(row_3_012_mask),
-            "row_1_123": engine.encode(row_1_123_mask),
-            "row_2_23": engine.encode(row_2_23_mask),
-            "row_3_3": engine.encode(row_3_3_mask),
+            "row_0": row_0_mask,
+            "row_1_0": row_1_0_mask,
+            "row_2_01": row_2_01_mask,
+            "row_3_012": row_3_012_mask,
+            "row_1_123": row_1_123_mask,
+            "row_2_23": row_2_23_mask,
+            "row_3_3": row_3_3_mask,
         }
 
         # Persist on context for future reuse
