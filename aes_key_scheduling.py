@@ -82,7 +82,7 @@ __all__ = [
 ]
 
 
-def _rot_word_int_domain(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     """Apply RotWord operation to the first 4 word (bytes 0-3) of flat key array.
     
     SIMD batching된 키를 입력으로 받아, 첫 행의 4 bytes를 왼쪽으로 1 byte circular shift하는 연산을 취한 후 반환한다.
@@ -264,18 +264,23 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     for i in range(4, 44):
         if i % 4 == 0:
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
+            start_time = time.time()
             sub_word_hi, sub_word_lo = _sub_word(engine_context, word_hi[i-1], word_lo[i-1])
-            rot_word_hi, rot_word_lo = _rot_word_int_domain(engine_context, sub_word_hi, sub_word_lo)
+            rot_word_hi, rot_word_lo = _rot_word(engine_context, sub_word_hi, sub_word_lo)
             rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, rot_word_hi, rot_word_lo, i//4)
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
+            end_time = time.time()
+            print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
         else:
+            start_time = time.time()
             # 4의 배수 x - 4의 배수 -1 번째 워드와 4의 배수 - 3 번째 워드를 xor 연산
             xor_hi, xor_lo = _xor(engine_context, word_hi[i-1], word_lo[i-1], word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
-            
+            end_time = time.time()
+            print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
     return word_hi, word_lo
     
     
