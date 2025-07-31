@@ -210,14 +210,6 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
 
     return rotated_rows_hi, rotated_rows_lo
 
-def inverse_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
-    """
-    Inverse ShiftRows operation for AES-128 ECB mode with FHE compatibility.
-    """
-    pass
-
-
-
 if __name__ == "__main__":
     from aes_transform_zeta import int_to_zeta, zeta_to_int
     from aes_split_to_nibble import split_to_nibbles

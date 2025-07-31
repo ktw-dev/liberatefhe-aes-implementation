@@ -1,5 +1,6 @@
 from __future__ import annotations
-
+from aes_transform_zeta import int_to_zeta, zeta_to_int
+import time
 """
 aes-key-scheduling explanation
 
@@ -105,11 +106,8 @@ def _rot_word_int_domain(engine_context: CKKS_EngineContext, enc_key_hi, enc_key
     public_key = engine_context.get_public_key()
     
     # ------------------------------Masking------------------------------
-    key_mask_0_0 = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
-    key_mask_0_123 = np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
-    
-    key_mask_0_0_plain = engine.encode(key_mask_0_0)
-    key_mask_0_123_plain = engine.encode(key_mask_0_123)
+    key_mask_0_0_plain = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
+    key_mask_0_123_plain = np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
     
     key_mask_hi_0_0 = engine.multiply(enc_key_hi, key_mask_0_0_plain)
     key_mask_hi_0_123 = engine.multiply(enc_key_hi, key_mask_0_123_plain)
@@ -165,20 +163,20 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     rcon_lo = rcon_value & 0x0F
     
     # Transform to zeta representation
-    rcon_zeta_hi = transform_to_zeta(np.full(16 * max_blocks, rcon_hi))
-    rcon_zeta_lo = transform_to_zeta(np.full(16 * max_blocks, rcon_lo))
+    rcon_zeta_hi = int_to_zeta(np.full(16 * max_blocks, rcon_hi))
+    rcon_zeta_lo = int_to_zeta(np.full(16 * max_blocks, rcon_lo))
     
     # Apply mask to Rcon
     rcon_zeta_hi_masked = rcon_zeta_hi * first_byte_mask
     rcon_zeta_lo_masked = rcon_zeta_lo * first_byte_mask
     
     # Encode as plaintext
-    rcon_plain_hi = engine.encode(rcon_zeta_hi_masked)
-    rcon_plain_lo = engine.encode(rcon_zeta_lo_masked)
+    rcon_plain_hi = engine.encrypt(rcon_zeta_hi_masked, public_key)
+    rcon_plain_lo = engine.encrypt(rcon_zeta_lo_masked, public_key)
     
     # XOR with key using plaintext-ciphertext addition
-    result_hi = _xor_operation(engine_context, enc_key_hi, engine.encrypt(rcon_plain_hi, public_key))
-    result_lo = _xor_operation(engine_context, enc_key_lo, engine.encrypt(rcon_plain_lo, public_key))
+    result_hi = _xor_operation(engine_context, enc_key_hi, rcon_plain_hi)
+    result_lo = _xor_operation(engine_context, enc_key_lo, rcon_plain_lo)
     
     return result_hi, result_lo
 
@@ -315,7 +313,11 @@ if __name__ == "__main__":
     enc_key_word_hi_list = [enc_key_word_hi_0, enc_key_word_hi_1, enc_key_word_hi_2, enc_key_word_hi_3]
     enc_key_word_lo_list = [enc_key_word_lo_0, enc_key_word_lo_1, enc_key_word_lo_2, enc_key_word_lo_3]
     
+    print("Key scheduling start")
+    start_time = time.time()
     key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_word_hi_list, enc_key_word_lo_list)
+    end_time = time.time()
+    print(f"Key scheduling time: {end_time - start_time} seconds")
     
     print()
     
