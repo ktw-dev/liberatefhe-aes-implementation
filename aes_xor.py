@@ -123,7 +123,7 @@ def _xor_operation(engine_context, enc_alpha, enc_beta):
         term = engine.multiply(base_x[i], base_y[j], relin_key)
         term_res = engine.multiply(term, coeff_pt)
         cipher_res = engine.add(cipher_res, term_res)
-    
+        
     return cipher_res
 
 

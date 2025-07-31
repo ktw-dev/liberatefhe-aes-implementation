@@ -179,12 +179,54 @@ def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
 # AddRoundKey --------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-def AddRoundKey(engine_context, enc_data, key_list):
-    enc_data = _xor_operation(engine_context, enc_data, key_list)
+def AddRoundKey(engine_context, enc_data, key):
+    engine = engine_context.get_engine()
+    
+    enc_data = _xor_operation(engine_context, enc_data, key)
+    enc_data = engine.bootstrap(enc_data, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     return enc_data
 
+# -----------------------------------------------------------------------------
+# ShiftRows --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def shift_rows(engine_context, enc_data_hi, enc_data_lo):    
+    enc_data_hi, enc_data_lo = _shift_rows(engine_context, enc_data_hi, enc_data_lo)
+    return enc_data_hi, enc_data_lo
 
+# -----------------------------------------------------------------------------
+# SubBytes --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def sub_bytes(engine_context, enc_data_hi, enc_data_lo):
+    enc_data_hi, enc_data_lo = _sub_bytes(engine_context, enc_data_hi, enc_data_lo)
+    return enc_data_hi, enc_data_lo 
 
+# -----------------------------------------------------------------------------
+# MixColumns --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def mix_columns(engine_context, enc_data_hi, enc_data_lo):
+    enc_data_hi, enc_data_lo = _mix_columns(engine_context, enc_data_hi, enc_data_lo)
+    return enc_data_hi, enc_data_lo
+
+# -----------------------------------------------------------------------------
+# Inverse ShiftRows --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def inv_shift_rows(engine_context, enc_data_hi, enc_data_lo):
+    enc_data_hi, enc_data_lo = _inv_shift_rows(engine_context, enc_data_hi, enc_data_lo)
+    return enc_data_hi, enc_data_lo
+
+# -----------------------------------------------------------------------------
+# Inverse SubBytes --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def inv_sub_bytes(engine_context, enc_data_hi, enc_data_lo):
+    enc_data_hi, enc_data_lo = _inv_sub_bytes(engine_context, enc_data_hi, enc_data_lo)
+    return enc_data_hi, enc_data_lo
+
+# -----------------------------------------------------------------------------
+# Inverse MixColumns --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def inv_mix_columns(engine_context, enc_data_hi, enc_data_lo):
+    enc_data_hi, enc_data_lo = _inv_mix_columns(engine_context, enc_data_hi, enc_data_lo)
+    return enc_data_hi, enc_data_lo
 
 # -----------------------------------------------------------------------------
 # Utility: stage completion ----------------------------------------------------
@@ -259,8 +301,8 @@ if __name__ == "__main__":
     # --- data HE-encryption stage ------------------------------------------------
     
     # 1. 데이터 암호화
-    enc_data_hi = engine.encrypt(data_zeta_hi, public_key)
-    enc_data_lo = engine.encrypt(data_zeta_lo, public_key)
+    enc_data_hi = engine.encrypt(data_zeta_hi, public_key, level=10)
+    enc_data_lo = engine.encrypt(data_zeta_lo, public_key, level=10)
     
     # DEBUG
     # print(enc_data_hi)
@@ -280,46 +322,218 @@ if __name__ == "__main__":
     enc_key_hi_list = []
     enc_key_lo_list = []
     for i in range(len(key_hi_list)):
-        enc_key_hi_list.append(engine.encrypt(key_hi_list[i], public_key))
-        enc_key_lo_list.append(engine.encrypt(key_lo_list[i], public_key))
+        enc_key_hi_list.append(engine.encrypt(key_hi_list[i], public_key, level=10))
+        enc_key_lo_list.append(engine.encrypt(key_lo_list[i], public_key, level=10))
     
     # print(enc_key_hi_list) # Complete!!
-    # print(enc_key_lo_list) # Complete!!
+    # print(enc_key_lo_list) # Complete!!    
+    
+    wait_next_stage("key Scheduling", "encryption stage")
     
     # ========================================================================
     # === Encryption stage ===================================================
     # ========================================================================
 
     # --- Round 0 --------------------------------------------------------------
-    enc_data_hi_round_0 = AddRoundKey(enc_data_hi, enc_key_hi_list[0])
-    enc_data_lo_round_0 = AddRoundKey(enc_data_lo, enc_key_lo_list[0])
+    start_time = time.time()
+    enc_data_hi_round_1 = AddRoundKey(engine_context, enc_data_hi, enc_key_hi_list[0])
+    enc_data_lo_round_1 = AddRoundKey(engine_context, enc_data_lo, enc_key_lo_list[0])
+    end_time = time.time()
+    print(f"addkey complete!!! Time taken: {(end_time - start_time)} seconds")
+        
+    # --- Round 1 --------------------------------------------------------------
+    start_time = time.time()
+    sub_s_time = time.time()
+    enc_data_hi_round_1, enc_data_lo_round_1 = sub_bytes(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
+    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    sub_e_time = time.time()
+    print(f"sub_bytes complete!!! Time taken: {sub_e_time - sub_s_time} seconds")
     
-    enc_data_hi_round_0, enc_data_lo_round_0 = shift_rows(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
+    shift_s_time = time.time()
+    enc_data_hi_round_1, enc_data_lo_round_1 = shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
+    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    shift_e_time = time.time()
+    print(f"shift_rows complete!!! Time taken: {shift_e_time - shift_s_time} seconds")
     
-    enc_data_hi_round_0, enc_data_lo_round_0 = sub_bytes(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
+    mix_s_time = time.time()
+    enc_data_hi_round_1, enc_data_lo_round_1 = mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
+    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    mix_e_time = time.time()
+    print(f"mix_columns complete!!! Time taken: {mix_e_time - mix_s_time} seconds")
     
+    addkey_s_time = time.time()
+    enc_data_hi_round_2 = AddRoundKey(engine_context, enc_data_hi_round_1, enc_key_hi_list[1])
+    enc_data_lo_round_2 = AddRoundKey(engine_context, enc_data_lo_round_1, enc_key_lo_list[1])
+    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
+    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    addkey_e_time = time.time()
+    print(f"addkey complete!!! Time taken: {addkey_e_time - addkey_s_time} seconds")
     
+    stop_time = time.time()
+    print(f"round 1 complete!!! Time taken: {(stop_time - start_time)} seconds")
     
+    # --- Round 2 --------------------------------------------------------------
+    enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
+    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     
+    enc_data_hi_round_2, enc_data_lo_round_2 = shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
+    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     
+    enc_data_hi_round_2, enc_data_lo_round_2 = mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
+    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     
-    # 대충 암호화 하는 과정
-    enc_data_hi = None
-    enc_data_lo = None
+    enc_data_hi_round_3 = AddRoundKey(engine_context, enc_data_hi_round_2, enc_key_hi_list[2])
+    enc_data_lo_round_3 = AddRoundKey(engine_context, enc_data_lo_round_2, enc_key_lo_list[2])
+    enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
+    enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
+    
+    # --- Round 3 --------------------------------------------------------------
+    enc_data_hi_round_3, enc_data_lo_round_3 = sub_bytes(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
+    enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
+    
+    enc_data_hi_round_3, enc_data_lo_round_3 = shift_rows(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
+    enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
+    
+    enc_data_hi_round_3, enc_data_lo_round_3 = mix_columns(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
+    enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
+    
+    enc_data_hi_round_4 = AddRoundKey(engine_context, enc_data_hi_round_3, enc_key_hi_list[3])
+    enc_data_lo_round_4 = AddRoundKey(engine_context, enc_data_lo_round_3, enc_key_lo_list[3])
+    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
+    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    
+    # --- Round 4 --------------------------------------------------------------
+    enc_data_hi_round_4, enc_data_lo_round_4 = sub_bytes(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
+    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    
+    enc_data_hi_round_4, enc_data_lo_round_4 = shift_rows(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
+    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    
+    enc_data_hi_round_4, enc_data_lo_round_4 = mix_columns(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
+    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    
+    enc_data_hi_round_5 = AddRoundKey(engine_context, enc_data_hi_round_4, enc_key_hi_list[4])
+    enc_data_lo_round_5 = AddRoundKey(engine_context, enc_data_lo_round_4, enc_key_lo_list[4])
+    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
+    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    
+    # --- Round 5 --------------------------------------------------------------
+    enc_data_hi_round_5, enc_data_lo_round_5 = sub_bytes(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
+    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    
+    enc_data_hi_round_5, enc_data_lo_round_5 = shift_rows(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
+    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    
+    enc_data_hi_round_5, enc_data_lo_round_5 = mix_columns(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
+    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    
+    enc_data_hi_round_6 = AddRoundKey(engine_context, enc_data_hi_round_5, enc_key_hi_list[5])
+    enc_data_lo_round_6 = AddRoundKey(engine_context, enc_data_lo_round_5, enc_key_lo_list[5])
+    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
+    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    
+    # --- Round 6 --------------------------------------------------------------
+    enc_data_hi_round_6, enc_data_lo_round_6 = sub_bytes(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
+    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    
+    enc_data_hi_round_6, enc_data_lo_round_6 = shift_rows(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
+    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    
+    enc_data_hi_round_6, enc_data_lo_round_6 = mix_columns(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
+    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    
+    enc_data_hi_round_7 = AddRoundKey(engine_context, enc_data_hi_round_6, enc_key_hi_list[6])
+    enc_data_lo_round_7 = AddRoundKey(engine_context, enc_data_lo_round_6, enc_key_lo_list[6])
+    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
+    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    
+    # --- Round 7 --------------------------------------------------------------
+    enc_data_hi_round_7, enc_data_lo_round_7 = sub_bytes(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
+    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    
+    enc_data_hi_round_7, enc_data_lo_round_7 = shift_rows(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
+    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    
+    enc_data_hi_round_7, enc_data_lo_round_7 = mix_columns(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
+    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    
+    enc_data_hi_round_8 = AddRoundKey(engine_context, enc_data_hi_round_7, enc_key_hi_list[7])
+    enc_data_lo_round_8 = AddRoundKey(engine_context, enc_data_lo_round_7, enc_key_lo_list[7])
+    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
+    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    
+    # --- Round 8 --------------------------------------------------------------
+    enc_data_hi_round_8, enc_data_lo_round_8 = sub_bytes(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
+    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    
+    enc_data_hi_round_8, enc_data_lo_round_8 = shift_rows(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
+    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    
+    enc_data_hi_round_8, enc_data_lo_round_8 = mix_columns(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
+    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    
+    enc_data_hi_round_9 = AddRoundKey(engine_context, enc_data_hi_round_8, enc_key_hi_list[8])
+    enc_data_lo_round_9 = AddRoundKey(engine_context, enc_data_lo_round_8, enc_key_lo_list[8])
+    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
+    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    
+    # --- Round 9 --------------------------------------------------------------
+    enc_data_hi_round_9, enc_data_lo_round_9 = sub_bytes(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
+    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    
+    enc_data_hi_round_9, enc_data_lo_round_9 = shift_rows(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
+    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    
+    enc_data_hi_round_9, enc_data_lo_round_9 = mix_columns(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
+    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    
+    enc_data_hi_round_10 = AddRoundKey(engine_context, enc_data_hi_round_9, enc_key_hi_list[9])
+    enc_data_lo_round_10 = AddRoundKey(engine_context, enc_data_lo_round_9, enc_key_lo_list[9])
+    enc_data_hi_round_10 = engine.intt(enc_data_hi_round_10)
+    enc_data_lo_round_10 = engine.intt(enc_data_lo_round_10)
+    
+    # --- Round 10 --------------------------------------------------------------
+    enc_data_hi_round_10, enc_data_lo_round_10 = sub_bytes(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
+    enc_data_hi_round_10 = engine.intt(enc_data_hi_round_10)
+    enc_data_lo_round_10 = engine.intt(enc_data_lo_round_10)
+    
+    enc_data_hi_round_10, enc_data_lo_round_10 = shift_rows(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
+    enc_data_hi_round_10 = engine.intt(enc_data_hi_round_10)
+    enc_data_lo_round_10 = engine.intt(enc_data_lo_round_10)
+    
+    enc_data_hi = AddRoundKey(engine_context, enc_data_hi_round_10, enc_key_hi_list[10])
+    enc_data_lo = AddRoundKey(engine_context, enc_data_lo_round_10, enc_key_lo_list[10])
+    enc_data_hi = engine.intt(enc_data_hi)
+    enc_data_lo = engine.intt(enc_data_lo)
+    
     wait_next_stage("encryption stage", "decryption stage")
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     # --- Decryption stage ----------------------------------------------------
     
@@ -332,109 +546,109 @@ if __name__ == "__main__":
     key_lo_list = [key_lo_list[::-1]]
         
     # --- Round 0 --------------------------------------------------------------
-    enc_data_hi_round_0 = AddRoundKey(enc_data_hi, key_hi_list[0])
-    enc_data_lo_round_0 = AddRoundKey(enc_data_lo, key_lo_list[0])
+    dec_data_hi_round_0 = AddRoundKey(enc_data_hi, key_hi_list[0])
+    dec_data_lo_round_0 = AddRoundKey(enc_data_lo, key_lo_list[0])
         
-    enc_data_hi_round_0, enc_data_lo_round_0 = inverse_shift_rows(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
+    dec_data_hi_round_0, dec_data_lo_round_0 = inv_shift_rows(engine_context, dec_data_hi_round_0, dec_data_lo_round_0)
     
-    enc_data_hi_round_1, enc_data_lo_round_1 = inverse_sub_bytes(engine_context, enc_data_hi_round_0, enc_data_lo_round_0)
+    dec_data_hi_round_1, dec_data_lo_round_1 = inv_sub_bytes(engine_context, dec_data_hi_round_0, dec_data_lo_round_0)
     
     # --- Round 1 --------------------------------------------------------------
-    enc_data_hi_round_1 = AddRoundKey(enc_data_hi_round_1, key_hi_list[1])
-    enc_data_lo_round_1 = AddRoundKey(enc_data_lo_round_1, key_lo_list[1])
+    dec_data_hi_round_1 = AddRoundKey(dec_data_hi_round_1, key_hi_list[1])
+    dec_data_lo_round_1 = AddRoundKey(dec_data_lo_round_1, key_lo_list[1])
     
-    enc_data_hi_round_1, enc_data_lo_round_1 = inverse_mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    dec_data_hi_round_1, dec_data_lo_round_1 = inv_mix_columns(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
     
-    enc_data_hi_round_1, enc_data_lo_round_1 = inverse_shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    dec_data_hi_round_1, dec_data_lo_round_1 = inv_shift_rows(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
     
-    enc_data_hi_round_2, enc_data_lo_round_2 = inverse_sub_bytes(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    dec_data_hi_round_2, dec_data_lo_round_2 = inv_sub_bytes(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
     
     # --- Round 2 --------------------------------------------------------------
-    enc_data_hi_round_2 = AddRoundKey(enc_data_hi_round_2, key_hi_list[2])
-    enc_data_lo_round_2 = AddRoundKey(enc_data_lo_round_2, key_lo_list[2])
+    dec_data_hi_round_2 = AddRoundKey(dec_data_hi_round_2, key_hi_list[2])
+    dec_data_lo_round_2 = AddRoundKey(dec_data_lo_round_2, key_lo_list[2])
     
-    enc_data_hi_round_2, enc_data_lo_round_2 = inverse_mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    dec_data_hi_round_2, dec_data_lo_round_2 = inv_mix_columns(engine_context, dec_data_hi_round_2, dec_data_lo_round_2)
     
-    enc_data_hi_round_2, enc_data_lo_round_2 = inverse_shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    dec_data_hi_round_2, dec_data_lo_round_2 = inv_shift_rows(engine_context, dec_data_hi_round_2, dec_data_lo_round_2)
     
-    enc_data_hi_round_3, enc_data_lo_round_3 = inverse_sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    dec_data_hi_round_3, dec_data_lo_round_3 = inv_sub_bytes(engine_context, dec_data_hi_round_2, dec_data_lo_round_2)
     
     # --- Round 3 --------------------------------------------------------------
-    enc_data_hi_round_3 = AddRoundKey(enc_data_hi_round_3, key_hi_list[3])
-    enc_data_lo_round_3 = AddRoundKey(enc_data_lo_round_3, key_lo_list[3])
+    dec_data_hi_round_3 = AddRoundKey(dec_data_hi_round_3, key_hi_list[3])
+    dec_data_lo_round_3 = AddRoundKey(dec_data_lo_round_3, key_lo_list[3])
     
-    enc_data_hi_round_3, enc_data_lo_round_3 = inverse_mix_columns(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    dec_data_hi_round_3, dec_data_lo_round_3 = inv_mix_columns(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
-    enc_data_hi_round_3, enc_data_lo_round_3 = inverse_shift_rows(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    dec_data_hi_round_3, dec_data_lo_round_3 = inv_shift_rows(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
-    enc_data_hi_round_4, enc_data_lo_round_4 = inverse_sub_bytes(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    dec_data_hi_round_4, dec_data_lo_round_4 = inv_sub_bytes(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
     # --- Round 4 --------------------------------------------------------------
-    enc_data_hi_round_4 = AddRoundKey(enc_data_hi_round_4, key_hi_list[4])
-    enc_data_lo_round_4 = AddRoundKey(enc_data_lo_round_4, key_lo_list[4])
+    dec_data_hi_round_4 = AddRoundKey(dec_data_hi_round_4, key_hi_list[4])
+    dec_data_lo_round_4 = AddRoundKey(dec_data_lo_round_4, key_lo_list[4])
     
-    enc_data_hi_round_4, enc_data_lo_round_4 = inverse_mix_columns(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    dec_data_hi_round_4, dec_data_lo_round_4 = inv_mix_columns(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
-    enc_data_hi_round_4, enc_data_lo_round_4 = inverse_shift_rows(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    dec_data_hi_round_4, dec_data_lo_round_4 = inv_shift_rows(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
-    enc_data_hi_round_5, enc_data_lo_round_5 = inverse_sub_bytes(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
+    dec_data_hi_round_5, dec_data_lo_round_5 = inv_sub_bytes(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
     # --- Round 5 --------------------------------------------------------------
-    enc_data_hi_round_5 = AddRoundKey(enc_data_hi_round_5, key_hi_list[5])
-    enc_data_lo_round_5 = AddRoundKey(enc_data_lo_round_5, key_lo_list[5])
+    dec_data_hi_round_5 = AddRoundKey(dec_data_hi_round_5, key_hi_list[5])
+    dec_data_lo_round_5 = AddRoundKey(dec_data_lo_round_5, key_lo_list[5])
     
-    enc_data_hi_round_5, enc_data_lo_round_5 = inverse_mix_columns(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    dec_data_hi_round_5, dec_data_lo_round_5 = inv_mix_columns(engine_context, dec_data_hi_round_5, dec_data_lo_round_5)
     
-    enc_data_hi_round_5, enc_data_lo_round_5 = inverse_shift_rows(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    dec_data_hi_round_5, dec_data_lo_round_5 = inv_shift_rows(engine_context, dec_data_hi_round_5, dec_data_lo_round_5)
     
-    enc_data_hi_round_6, enc_data_lo_round_6 = inverse_sub_bytes(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    dec_data_hi_round_6, dec_data_lo_round_6 = inv_sub_bytes(engine_context, dec_data_hi_round_5, dec_data_lo_round_5)
     
     # --- Round 6 --------------------------------------------------------------
-    enc_data_hi_round_6 = AddRoundKey(enc_data_hi_round_6, key_hi_list[6])
-    enc_data_lo_round_6 = AddRoundKey(enc_data_lo_round_6, key_lo_list[6])
+    dec_data_hi_round_6 = AddRoundKey(dec_data_hi_round_6, key_hi_list[6])
+    dec_data_lo_round_6 = AddRoundKey(dec_data_lo_round_6, key_lo_list[6])
     
-    enc_data_hi_round_6, enc_data_lo_round_6 = inverse_mix_columns(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    dec_data_hi_round_6, dec_data_lo_round_6 = inv_mix_columns(engine_context, dec_data_hi_round_6, dec_data_lo_round_6)
     
-    enc_data_hi_round_6, enc_data_lo_round_6 = inverse_shift_rows(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    dec_data_hi_round_6, dec_data_lo_round_6 = inv_shift_rows(engine_context, dec_data_hi_round_6, dec_data_lo_round_6)
     
-    enc_data_hi_round_7, enc_data_lo_round_7 = inverse_sub_bytes(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    dec_data_hi_round_7, dec_data_lo_round_7 = inv_sub_bytes(engine_context, dec_data_hi_round_6, dec_data_lo_round_6)
     
     # --- Round 7 --------------------------------------------------------------
-    enc_data_hi_round_7 = AddRoundKey(enc_data_hi_round_7, key_hi_list[7])
-    enc_data_lo_round_7 = AddRoundKey(enc_data_lo_round_7, key_lo_list[7])
+    dec_data_hi_round_7 = AddRoundKey(dec_data_hi_round_7, key_hi_list[7])
+    dec_data_lo_round_7 = AddRoundKey(dec_data_lo_round_7, key_lo_list[7])
     
-    enc_data_hi_round_7, enc_data_lo_round_7 = inverse_mix_columns(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    dec_data_hi_round_7, dec_data_lo_round_7 = inv_mix_columns(engine_context, dec_data_hi_round_7, dec_data_lo_round_7)
     
-    enc_data_hi_round_7, enc_data_lo_round_7 = inverse_shift_rows(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    dec_data_hi_round_7, dec_data_lo_round_7 = inv_shift_rows(engine_context, dec_data_hi_round_7, dec_data_lo_round_7)
     
-    enc_data_hi_round_8, enc_data_lo_round_8 = inverse_sub_bytes(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    dec_data_hi_round_8, dec_data_lo_round_8 = inv_sub_bytes(engine_context, dec_data_hi_round_7, dec_data_lo_round_7)
     
     # --- Round 8 --------------------------------------------------------------
-    enc_data_hi_round_8 = AddRoundKey(enc_data_hi_round_8, key_hi_list[8])
-    enc_data_lo_round_8 = AddRoundKey(enc_data_lo_round_8, key_lo_list[8])
+    dec_data_hi_round_8 = AddRoundKey(dec_data_hi_round_8, key_hi_list[8])
+    dec_data_lo_round_8 = AddRoundKey(dec_data_lo_round_8, key_lo_list[8])
     
-    enc_data_hi_round_8, enc_data_lo_round_8 = inverse_mix_columns(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    dec_data_hi_round_8, dec_data_lo_round_8 = inv_mix_columns(engine_context, dec_data_hi_round_8, dec_data_lo_round_8)
     
-    enc_data_hi_round_8, enc_data_lo_round_8 = inverse_shift_rows(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    dec_data_hi_round_8, dec_data_lo_round_8 = inv_shift_rows(engine_context, dec_data_hi_round_8, dec_data_lo_round_8)
     
-    enc_data_hi_round_9, enc_data_lo_round_9 = inverse_sub_bytes(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    dec_data_hi_round_9, dec_data_lo_round_9 = inv_sub_bytes(engine_context, dec_data_hi_round_8, dec_data_lo_round_8)
     
     # --- Round 9 --------------------------------------------------------------
-    enc_data_hi_round_9 = AddRoundKey(enc_data_hi_round_9, key_hi_list[9])
-    enc_data_lo_round_9 = AddRoundKey(enc_data_lo_round_9, key_lo_list[9])
+    dec_data_hi_round_9 = AddRoundKey(dec_data_hi_round_9, key_hi_list[9])
+    dec_data_lo_round_9 = AddRoundKey(dec_data_lo_round_9, key_lo_list[9])
     
-    enc_data_hi_round_9, enc_data_lo_round_9 = inverse_mix_columns(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    dec_data_hi_round_9, dec_data_lo_round_9 = inv_mix_columns(engine_context, dec_data_hi_round_9, dec_data_lo_round_9)
     
-    enc_data_hi_round_9, enc_data_lo_round_9 = inverse_shift_rows(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    dec_data_hi_round_9, dec_data_lo_round_9 = inv_shift_rows(engine_context, dec_data_hi_round_9, dec_data_lo_round_9)
     
-    enc_data_hi_round_10, enc_data_lo_round_10 = inverse_sub_bytes(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    dec_data_hi_round_10, dec_data_lo_round_10 = inv_sub_bytes(engine_context, dec_data_hi_round_9, dec_data_lo_round_9)
     
     # --- Round 10 --------------------------------------------------------------
-    enc_data_hi_round_10 = AddRoundKey(enc_data_hi_round_10, key_hi_list[10])
-    enc_data_lo_round_10 = AddRoundKey(enc_data_lo_round_10, key_lo_list[10])
+    dec_data_hi_round_10 = AddRoundKey(dec_data_hi_round_10, key_hi_list[10])
+    dec_data_lo_round_10 = AddRoundKey(dec_data_lo_round_10, key_lo_list[10])
     
-    dec_data_hi = engine.decrypt(enc_data_hi_round_10, engine_context.get_secret_key())
-    dec_data_lo = engine.decrypt(enc_data_lo_round_10, engine_context.get_secret_key())
+    dec_data_hi = engine.decrypt(dec_data_hi_round_10, engine_context.get_secret_key())
+    dec_data_lo = engine.decrypt(dec_data_lo_round_10, engine_context.get_secret_key())
     
     dec_data_hi_int = zeta_to_int(dec_data_hi)
     dec_data_lo_int = zeta_to_int(dec_data_lo)
