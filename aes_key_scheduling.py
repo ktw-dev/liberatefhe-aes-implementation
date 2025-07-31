@@ -124,6 +124,9 @@ def _rot_word_int_domain(engine_context: CKKS_EngineContext, enc_key_hi, enc_key
 
     rotated_hi = engine.multiply(rotated_hi_0_to_3, rotated_hi_123_to_012, engine_context.get_relinearization_key())
     rotated_lo = engine.multiply(rotated_lo_0_to_3, rotated_lo_123_to_012, engine_context.get_relinearization_key())
+    
+    rotated_hi = engine.bootstrap(rotated_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rotated_lo = engine.bootstrap(rotated_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
 
     return rotated_hi, rotated_lo
     
@@ -178,10 +181,19 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     result_hi = _xor_operation(engine_context, enc_key_hi, rcon_plain_hi)
     result_lo = _xor_operation(engine_context, enc_key_lo, rcon_plain_lo)
     
+    result_hi = engine.bootstrap(result_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    result_lo = engine.bootstrap(result_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
     return result_hi, result_lo
 
 def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi, xor_key_lo):
-    return _xor_operation(engine_context, enc_key_hi, xor_key_hi), _xor_operation(engine_context, enc_key_lo, xor_key_lo)
+    engine = engine_context.get_engine()
+    
+    xor_hi, xor_lo = _xor_operation(engine_context, enc_key_hi, xor_key_hi), _xor_operation(engine_context, enc_key_lo, xor_key_lo)
+    
+    xor_hi = engine.bootstrap(xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    xor_lo = engine.bootstrap(xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    return xor_hi, xor_lo
 
 def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     """
@@ -254,7 +266,7 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
             sub_word_hi, sub_word_lo = _sub_word(engine_context, word_hi[i-1], word_lo[i-1])
             rot_word_hi, rot_word_lo = _rot_word_int_domain(engine_context, sub_word_hi, sub_word_lo)
-            rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i//4)
+            rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, rot_word_hi, rot_word_lo, i//4)
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
