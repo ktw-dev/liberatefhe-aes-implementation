@@ -103,7 +103,6 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     """
     # load engine and keys
     engine = engine_context.get_engine()
-    public_key = engine_context.get_public_key()
     
     # ------------------------------Masking------------------------------
     key_mask_0_0_plain = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
@@ -252,11 +251,6 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     - 따라서 모든 키를 처리시 하나의 워드 씩 분리하여 처리한다. 즉 44개의 암호문을 생성하고 처리하게 될 것이다.
     - 이 과정에서 xor 연산 시 레벨이 5씩 감소하기 때문에 xor 처리하기 전 레벨이 5 미만이라면 부트스트랩을 통해 레벨을 10으로 만들어준다.
     """
-    engine = engine_context.get_engine()
-    public_key = engine_context.get_public_key()
-    
-    max_blocks = 2048
-    
     word_hi = enc_key_hi_list.copy()
     word_lo = enc_key_lo_list.copy()
     

@@ -166,12 +166,63 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
 
     return key, key_flat, key_upper, key_lower, key_zeta_upper, key_zeta_lower
 
+def key_initiation_fixed(*, max_blocks: int = 2048) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate a fixed AES-128 key and prepare its flat & nibble arrays.
+    
+    Each index of the 16-byte key is repeated 2048 times to create a total array
+    of size 32768 (16 * 2048).
+
+    Returns
+    -------
+    key_zeta_upper : (16*max_blocks,) complex128 – ζ^upper
+    key_zeta_lower : (16*max_blocks,) complex128 – ζ^lower
+    """
+    key = np.array([0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 
+                         0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c], dtype=np.uint8)
+
+    key_flat = key_to_flat_array(key, max_blocks)
+    key_upper, key_lower = split_to_nibbles(key_flat)
+
+    key_zeta_upper = int_to_zeta(key_upper)
+    key_zeta_lower = int_to_zeta(key_lower)
+
+    return key_zeta_upper, key_zeta_lower
+
 # -----------------------------------------------------------------------------
 # Key Scheduling --------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
-    scheduled_hi_list, scheduled_lo_list = key_scheduling(engine_context, enc_key_hi, enc_key_lo)
+    
+    enc_key_hi_list = []
+    enc_key_lo_list = []
+    
+    mask_row_0 = np.concatenate(np.ones(4 * 2048, dtype=np.uint8), np.zeros(12 * 2048, dtype=np.uint8))
+    mask_row_1 = np.concatenate(np.zeros(4 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(8 * 2048, dtype=np.uint8))
+    mask_row_2 = np.concatenate(np.zeros(8 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(4 * 2048, dtype=np.uint8))
+    mask_row_3 = np.concatenate(np.zeros(12 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8))    
+    
+    row_hi_0 = engine.multiply(enc_key_hi, mask_row_0)
+    row_hi_1 = engine.multiply(enc_key_hi, mask_row_1)
+    row_hi_2 = engine.multiply(enc_key_hi, mask_row_2)
+    row_hi_3 = engine.multiply(enc_key_hi, mask_row_3)
+    
+    row_lo_0 = engine.multiply(enc_key_lo, mask_row_0)
+    row_lo_1 = engine.multiply(enc_key_lo, mask_row_1)
+    row_lo_2 = engine.multiply(enc_key_lo, mask_row_2)
+    row_lo_3 = engine.multiply(enc_key_lo, mask_row_3)
+
+    enc_key_hi_list.append(row_hi_0)
+    enc_key_hi_list.append(row_hi_1)
+    enc_key_hi_list.append(row_hi_2)
+    enc_key_hi_list.append(row_hi_3)
+    
+    enc_key_lo_list.append(row_lo_3)
+    enc_key_lo_list.append(row_lo_0)
+    enc_key_lo_list.append(row_lo_1)
+    enc_key_lo_list.append(row_lo_2)
+
+    scheduled_hi_list, scheduled_lo_list = key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list)
     return scheduled_hi_list, scheduled_lo_list
 
 
@@ -289,22 +340,33 @@ if __name__ == "__main__":
 
     wait_next_stage("Data initiation", "key initiation")
 
-    # --- Key initiation stage -------------------------------------------------
-    key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
+    # # --- Key initiation stage -------------------------------------------------
+    # key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
+
+    # # DEBUG
+    # # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
+
+    # # print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
+    # # print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
+
+    # --- Fixed key initiation stage -------------------------------------------------
+    key_zeta_hi, key_zeta_lo = key_initiation_fixed()
 
     # DEBUG
-    # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
-
     # print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
     # print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
 
     wait_next_stage("Key initiation", "data/key HE-encryption")
     
-    # --- data HE-encryption stage ------------------------------------------------
+    # --- data/key HE-encryption stage ------------------------------------------------
     
     # 1. 데이터 암호화
-    enc_data_hi = engine.encrypt(data_zeta_hi, public_key, level=10)
-    enc_data_lo = engine.encrypt(data_zeta_lo, public_key, level=10)
+    enc_data_hi = engine.encrypt(data_zeta_hi, public_key)
+    enc_data_lo = engine.encrypt(data_zeta_lo, public_key)
+    
+    # 2. 키 암호화
+    enc_key_hi = engine.encrypt(key_zeta_hi, public_key)
+    enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
     
     # DEBUG
     # print(enc_data_hi)
@@ -312,24 +374,14 @@ if __name__ == "__main__":
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
-    # --- key Scheduling stage -------------------------------------------------
-    # key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_word_hi_list, enc_key_word_lo_list)
-    key_hi_list, key_lo_list = key_expansion_flat_nibbles(key_upper, key_lower)
+    # --- Fixedkey Scheduling stage -------------------------------------------------
+    enc_key_hi_list, enc_key_lo_list = key_scheduling(engine_context, enc_key_hi, enc_key_lo)
 
-    # print(len(key_hi_list)) # 11
-    # print(len(key_lo_list)) # 11
-    
-    # === 특수 목적 코드 ===
-    # 리스트 내 모든 키 암호화
-    enc_key_hi_list = []
-    enc_key_lo_list = []
-    for i in range(len(key_hi_list)):
-        enc_key_hi_list.append(engine.encrypt(key_hi_list[i], public_key, level=10))
-        enc_key_lo_list.append(engine.encrypt(key_lo_list[i], public_key, level=10))
-    
-    # print(enc_key_hi_list) # Complete!!
-    # print(enc_key_lo_list) # Complete!!    
-    
+    # DEBUG
+    # print(enc_key_hi_list)
+    # print(enc_key_lo_list)
+
+
     wait_next_stage("key Scheduling", "encryption stage")
     
     # ========================================================================
