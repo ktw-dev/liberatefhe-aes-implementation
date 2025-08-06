@@ -280,7 +280,7 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     
     
 if __name__ == "__main__":
-    from aes_main_process import engine_initiation, key_initiation
+    from aes_main_process import engine_initiation, fixed_key_initiation
     from aes_transform_zeta import zeta_to_int
     delta = [1 * 2048, 2 * 2048, 3 * 2048, 4 * 2048, 5 * 2048, 6 * 2048, 7 * 2048, 8 * 2048, 9 * 2048, 10 * 2048, 11 * 2048, 12 * 2048, 13 * 2048, 14 * 2048, 15 * 2048]
     engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta) 
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
     
-    _, _, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
+    key_zeta_hi, key_zeta_lo = fixed_key_initiation()
     
     max_blocks = 2048
 
