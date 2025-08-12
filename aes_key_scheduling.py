@@ -357,6 +357,7 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
             start_time = time.time()
             rot_word_hi, rot_word_lo = _rot_word(engine_context, word_hi[i-1], word_lo[i-1])
+            print(_extract_word_hex(engine_context, rot_word_hi, rot_word_lo))
             sub_word_hi, sub_word_lo = _sub_word(engine_context, rot_word_hi, rot_word_lo)
             rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i//4)
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
