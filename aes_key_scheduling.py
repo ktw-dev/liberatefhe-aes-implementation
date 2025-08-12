@@ -170,9 +170,25 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     
     rcon_hi = AES_RCON[round_num]
     rcon_lo = AES_RCON[round_num]
+
+    # Build plaintext vectors where first 1*2048 slots are filled with rcon_hi
+    # and the remaining 15*2048 slots are zeros. Keep dtype float64 for encode.
+    slot_cnt = engine_context.get_slot_count()
+    assert slot_cnt % 2048 == 0, "slot count should be a multiple of 2048"
+
+    rcon_hi_vec = np.zeros(slot_cnt, dtype=np.float64)
+    rcon_hi_vec[: 1 * 2048] = float(rcon_hi)
+    rcon_hi_pt = engine.encrypt(rcon_hi_vec, engine_context.get_public_key(), level=10)
+
+    # If needed later for low nibble as well
+    rcon_lo_vec = np.zeros(slot_cnt, dtype=np.float64)
+    rcon_lo_vec[: 1 * 2048] = float(rcon_lo)
+    rcon_lo_pt = engine.encrypt(rcon_lo_vec, engine_context.get_public_key(), level=10)
     
-    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi)
-    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo)
+    
+    # XOR ciphertext with Rcon plaintexts (broadcast in first 2048 slots)
+    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi_pt)
+    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo_pt)
     
     rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     rcon_xor_lo = engine.bootstrap(rcon_xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
