@@ -32,7 +32,7 @@ import time
 import numpy as np
 from engine_context import CKKS_EngineContext
 from aes_SubBytes import sub_bytes
-from aes_xor import xor_operation as _xor_operation
+from aes_xor import _xor_operation
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers (copied from aes-main-process) ------------------------
