@@ -304,13 +304,16 @@ if __name__ == "__main__":
     
     key_zeta_hi, key_zeta_lo = key_initiation_fixed()
     
+    key_zeta_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
+    key_zeta_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
+    
     enc_key_hi_list = []
     enc_key_lo_list = []
     
-    mask_row_0 = np.concatenate(np.ones(4 * 2048, dtype=np.uint8), np.zeros(12 * 2048, dtype=np.uint8))
-    mask_row_1 = np.concatenate(np.zeros(4 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(8 * 2048, dtype=np.uint8))
-    mask_row_2 = np.concatenate(np.zeros(8 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(4 * 2048, dtype=np.uint8))
-    mask_row_3 = np.concatenate(np.zeros(12 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8))    
+    mask_row_0 = np.concatenate((np.ones(4 * 2048), np.zeros(12 * 2048)))
+    mask_row_1 = np.concatenate((np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)))
+    mask_row_2 = np.concatenate((np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)))
+    mask_row_3 = np.concatenate((np.zeros(12 * 2048), np.ones(4 * 2048))) 
     
     row_hi_0 = engine.multiply(key_zeta_hi, mask_row_0)
     row_hi_1 = engine.multiply(key_zeta_hi, mask_row_1)

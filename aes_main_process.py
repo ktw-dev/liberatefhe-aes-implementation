@@ -180,10 +180,10 @@ def _key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     enc_key_hi_list = []
     enc_key_lo_list = []
     
-    mask_row_0 = np.concatenate(np.ones(4 * 2048, dtype=np.uint8), np.zeros(12 * 2048, dtype=np.uint8))
-    mask_row_1 = np.concatenate(np.zeros(4 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(8 * 2048, dtype=np.uint8))
-    mask_row_2 = np.concatenate(np.zeros(8 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(4 * 2048, dtype=np.uint8))
-    mask_row_3 = np.concatenate(np.zeros(12 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8))    
+    mask_row_0 = np.concatenate((np.ones(4 * 2048), np.zeros(12 * 2048)))
+    mask_row_1 = np.concatenate((np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)))
+    mask_row_2 = np.concatenate((np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)))
+    mask_row_3 = np.concatenate((np.zeros(12 * 2048), np.ones(4 * 2048)))    
     
     row_hi_0 = engine.multiply(enc_key_hi, mask_row_0)
     row_hi_1 = engine.multiply(enc_key_hi, mask_row_1)
