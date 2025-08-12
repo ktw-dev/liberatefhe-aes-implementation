@@ -94,6 +94,8 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     t_minus_1_word_hi = engine.clone(enc_key_hi)
     t_minus_1_word_lo = engine.clone(enc_key_lo)
     
+    print(_extract_word_hex(engine_context, t_minus_1_word_hi, t_minus_1_word_lo))
+    
     # ------------------------------Rotating------------------------------
     rotated_word_hi = engine.rotate(t_minus_1_word_hi, engine_context.get_fixed_rotation_key(4 * 2048))
     rotated_word_lo = engine.rotate(t_minus_1_word_lo, engine_context.get_fixed_rotation_key(4 * 2048))
@@ -359,7 +361,9 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             rot_word_hi, rot_word_lo = _rot_word(engine_context, word_hi[i-1], word_lo[i-1])
             print(_extract_word_hex(engine_context, rot_word_hi, rot_word_lo))
             sub_word_hi, sub_word_lo = _sub_word(engine_context, rot_word_hi, rot_word_lo)
+            print(_extract_word_hex(engine_context, sub_word_hi, sub_word_lo))
             rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i//4)
+            print(_extract_word_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
