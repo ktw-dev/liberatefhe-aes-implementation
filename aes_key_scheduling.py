@@ -218,7 +218,12 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
 def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi, xor_key_lo):
     engine = engine_context.get_engine()
     
-    xor_hi, xor_lo = _xor_operation(engine_context, enc_key_hi, xor_key_hi), _xor_operation(engine_context, enc_key_lo, xor_key_lo)
+    enc_key_hi_std = engine.intt(enc_key_hi)
+    enc_key_lo_std = engine.intt(enc_key_lo)
+    xor_key_hi_std = engine.intt(xor_key_hi)
+    xor_key_lo_std = engine.intt(xor_key_lo)
+    
+    xor_hi, xor_lo = _xor_operation(engine_context, enc_key_hi_std, xor_key_hi_std), _xor_operation(engine_context, enc_key_lo_std, xor_key_lo_std)
     
     xor_hi = engine.bootstrap(xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     xor_lo = engine.bootstrap(xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
