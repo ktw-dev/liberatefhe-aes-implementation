@@ -182,20 +182,27 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     slot_cnt = engine_context.get_slot_count()
     assert slot_cnt % 2048 == 0, "slot count should be a multiple of 2048"
 
-    rcon_hi_vec = np.zeros(slot_cnt, dtype=np.float64)
-    rcon_hi_vec[: 1 * 2048] = float(rcon_hi)
+    rcon_hi_vec = np.zeros(slot_cnt, dtype=np.complex128)
+    rcon_hi_vec[: 1 * 2048] = (rcon_hi)
     rcon_hi_pt = engine.encrypt(rcon_hi_vec, engine_context.get_public_key(), level=10)
 
     # If needed later for low nibble as well
-    rcon_lo_vec = np.zeros(slot_cnt, dtype=np.float64)
-    rcon_lo_vec[: 1 * 2048] = float(rcon_lo)
+    rcon_lo_vec = np.zeros(slot_cnt, dtype=np.complex128)
+    rcon_lo_vec[: 1 * 2048] = (rcon_lo)
     rcon_lo_pt = engine.encrypt(rcon_lo_vec, engine_context.get_public_key(), level=10)
     
     
-    # XOR ciphertext with Rcon plaintexts (broadcast in first 2048 slots)
-    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi_pt)
-    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo_pt)
-    
+    # Ensure operands are in standard (non-NTT) form before XOR polynomial
+    enc_key_hi_std = engine.intt(enc_key_hi)
+    enc_key_lo_std = engine.intt(enc_key_lo)
+    rcon_hi_std = engine.intt(rcon_hi_pt)
+    rcon_lo_std = engine.intt(rcon_lo_pt)
+
+    # XOR ciphertext with Rcon ciphertexts (broadcast in first 2048 slots)
+    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi_std, rcon_hi_std)
+    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo_std, rcon_lo_std)
+
+    # Keep in standard domain; caller will bootstrap if/when needed    
     rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     rcon_xor_lo = engine.bootstrap(rcon_xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
