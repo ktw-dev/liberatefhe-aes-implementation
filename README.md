@@ -1,4 +1,3 @@
-
 ## Project Architecture Analysis
 
 This analysis is based on the overall file structure and the central orchestration script, `aes_main_process.py`.
@@ -48,3 +47,35 @@ The data flows through the system in a sequential pipeline orchestrated by `aes_
 3.  **Hardcoded Parameters**: FHE engine parameters (like `delta_list`, `thread_count`) are hardcoded in the `if __name__ == "__main__"` block. For greater flexibility and reusability, these could be externalized into a configuration file (e.g., YAML, JSON) or passed as command-line arguments.
 
 4.  **Lack of Higher-Level Abstraction**: The main script is very low-level, manually calling every single AES step for every round. Introducing a class, such as `FHE_AES_Cipher`, could encapsulate the entire round-based logic. The main script would then simply need to instantiate this class and call a high-level method like `cipher.encrypt(encrypted_data)` or `cipher.decrypt(encrypted_data)`, making the main execution flow much cleaner.
+
+## Homomorphic XOR Operation
+
+The `aes_xor.py` script implements a homomorphic XOR operation on two encrypted 4-bit nibbles. This is a fundamental component of the `AddRoundKey` step in the AES algorithm.
+
+### Execution Analysis
+
+The core challenge is performing a bitwise XOR operation on encrypted data. Since the CKKS FHE scheme operates on complex numbers, a direct bitwise operation is not possible. The strategy is as follows:
+
+1.  **Zeta Transformation**: The 4-bit integers (nibbles, 0-15) are transformed into 16th roots of unity (ζ^k), where ζ = e^(-2πi/16). This maps the integers to unique points on the complex unit circle.
+2.  **Polynomial Evaluation**: The XOR operation in this zeta domain is equivalent to evaluating a specific bivariate polynomial, `P(x, y)`. The script evaluates this polynomial on the two encrypted inputs (`enc_alpha`, `enc_beta`).
+3.  **Coefficient-based Computation**: The polynomial `P(x, y)` is expressed as a sum of terms `c_ij * x^i * y^j`. The coefficients `c_ij` are pre-computed and stored in `coeffs/xor_mono_coeffs.json`. The script performs the homomorphic computation by multiplying the encrypted inputs raised to the required powers with these pre-computed coefficients.
+
+### Data Flow
+
+The data flow within the `_xor_operation` function is as follows:
+
+1.  **Inputs**: Two ciphertexts, `enc_alpha` and `enc_beta`, which are the encrypted zeta representations of the two nibbles to be XORed.
+2.  **Power Basis Generation**:
+    *   The `build_power_basis` function is called for both `enc_alpha` and `enc_beta`.
+    *   It computes the powers of the ciphertext from 1 to 8 (`ct^1` to `ct^8`) using `engine.make_power_basis`.
+    *   It then computes the powers from 9 to 15 by taking the cryptographic `conjugate` of the first 7 powers. In the CKKS scheme, `conjugate(ct^k)` is equivalent to `ct^-k`, and for a 16th root of unity, `ζ^-k` is the same as `ζ^(16-k)`. This is a highly efficient way to compute all necessary powers.
+    *   The result is a dictionary mapping exponents (0-15) to their corresponding ciphertexts.
+3.  **Coefficient Loading**:
+    *   The `_get_coeff_plaintexts` function loads the pre-computed coefficients from `coeffs/xor_mono_coeffs.json`.
+    *   These coefficients are encoded into FHE plaintexts, ready for homomorphic multiplication.
+4.  **Polynomial Evaluation**:
+    *   The script initializes an empty result ciphertext.
+    *   It iterates through the loaded coefficients. For each non-zero coefficient `c_ij`, it retrieves the corresponding powered ciphertexts `base_x[i]` and `base_y[j]`.
+    *   It computes the term `(base_x[i] * base_y[j]) * c_ij` using homomorphic multiplications (`engine.multiply`).
+    *   This result is added to the total sum using homomorphic addition (`engine.add`).
+5.  **Output**: The function returns a single ciphertext that encrypts the zeta representation of the XORed result. This output ciphertext can then be used in subsequent homomorphic operations or be decrypted to reveal the final integer result.

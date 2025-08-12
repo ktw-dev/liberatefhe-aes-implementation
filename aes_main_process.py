@@ -10,7 +10,7 @@ Sub-modules have dashes in their filenames, so they are loaded dynamically with
 importlib to avoid name conflicts.
 
 Future work (place-holders):
-    • key_schedule(...)
+    • key_scheduling(...)
     • sub_bytes(...)
     • shift_rows(...)
     • mix_columns(...)

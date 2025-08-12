@@ -73,24 +73,6 @@ def split_to_nibbles(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     lo = np.bitwise_and(arr, 0x0F, dtype=np.uint8)
     return hi, lo
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
     # Quick self-test / demo
     rng = np.random.default_rng()
