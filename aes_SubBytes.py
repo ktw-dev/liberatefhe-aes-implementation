@@ -134,6 +134,9 @@ def _sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tu
     # Optionally refresh scale/level via bootstrap (kept from original code)
     hi_ct = engine.bootstrap(hi_ct, relin_key, conj_key, engine_context.get_bootstrap_key())
     lo_ct = engine.bootstrap(lo_ct, relin_key, conj_key, engine_context.get_bootstrap_key())
+    
+    hi_ct = engine.intt(hi_ct)
+    lo_ct = engine.intt(lo_ct)
 
     return hi_ct, lo_ct
 
