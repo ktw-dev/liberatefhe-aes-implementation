@@ -137,12 +137,12 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     sub_bytes_hi = engine.multiply(sub_bytes_hi, masks)
     sub_bytes_lo = engine.multiply(sub_bytes_lo, masks)
     
+    sub_bytes_hi = engine.intt(sub_bytes_hi)
+    sub_bytes_lo = engine.intt(sub_bytes_lo)
+    
     # ------------------------------Bootstrap------------------------------
     sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     sub_bytes_lo = engine.bootstrap(sub_bytes_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    
-    sub_bytes_hi = engine.intt(sub_bytes_hi)
-    sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     return sub_bytes_hi, sub_bytes_lo
 
