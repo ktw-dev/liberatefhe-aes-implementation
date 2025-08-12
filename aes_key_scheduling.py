@@ -88,8 +88,8 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # load engine and keys
     engine = engine_context.get_engine()
     
-    t_minus_1_word_hi = enc_key_hi.copy()
-    t_minus_1_word_lo = enc_key_lo.copy()
+    t_minus_1_word_hi = engine.clone(enc_key_hi)
+    t_minus_1_word_lo = engine.clone(enc_key_lo)
     
     # ------------------------------Rotating------------------------------
     rotated_word_hi = engine.rotate(t_minus_1_word_hi, engine_context.get_fixed_rotation_key(4 * 2048))
