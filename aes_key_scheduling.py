@@ -34,6 +34,9 @@ from engine_context import CKKS_EngineContext
 from aes_SubBytes import sub_bytes
 from aes_xor import _xor_operation
 
+# verification
+from aes_ground_truth import WI_HEX_I4_TO_I43
+
 # -----------------------------------------------------------------------------
 # Dynamic import helpers (copied from aes-main-process) ------------------------
 # -----------------------------------------------------------------------------
@@ -170,6 +173,9 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     
     rcon_hi = AES_RCON[round_num]
     rcon_lo = AES_RCON[round_num]
+    
+    rcon_hi = int_to_zeta(rcon_hi)
+    rcon_lo = int_to_zeta(rcon_lo)
 
     # Build plaintext vectors where first 1*2048 slots are filled with rcon_hi
     # and the remaining 15*2048 slots are zeros. Keep dtype float64 for encode.
@@ -214,6 +220,60 @@ def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi,
     xor_lo = engine.intt(xor_lo)
     
     return xor_hi, xor_lo
+
+
+# -----------------------------------------------------------------------------
+# Verification helpers ---------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+def _blocks_nonzero_indices(arr: np.ndarray, block_size: int = 2048) -> list[int]:
+    """Return indices of 2048-slot blocks that contain any non-zero entries."""
+    num_blocks = arr.shape[0] // block_size
+    idxs: list[int] = []
+    for b in range(num_blocks):
+        block = arr[b * block_size : (b + 1) * block_size]
+        if np.any(block != 0):
+            idxs.append(b)
+    return idxs
+
+
+def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
+    """Decrypt hi/lo nibble ciphertexts and reconstruct 4-byte word as hex.
+
+    Assumes each byte occupies one 2048-slot block, repeated within the block.
+    Takes the first element from each non-zero block to form the byte sequence.
+    """
+    engine = engine_context.get_engine()
+    sk = engine_context.get_secret_key()
+
+    dec_hi = engine.decrypt(ct_hi, sk)
+    dec_lo = engine.decrypt(ct_lo, sk)
+
+    # Map zeta to integers 0..15, and zero-out tiny numerical noise
+    nib_hi = zeta_to_int(dec_hi)
+    nib_lo = zeta_to_int(dec_lo)
+
+    # Find blocks carrying data. Expect 4 blocks for a word.
+    idxs_hi = set(_blocks_nonzero_indices(nib_hi))
+    idxs_lo = set(_blocks_nonzero_indices(nib_lo))
+    idxs = sorted(idxs_hi.union(idxs_lo))
+    if len(idxs) > 4:
+        # keep last 4 contiguous blocks if more detected
+        idxs = idxs[-4:]
+    # When empty because of bootstrap/intt placement, fall back to zeros
+    bytes_out: list[int] = []
+    for b in idxs:
+        base = b * 2048
+        high = int(nib_hi[base]) & 0xF
+        low = int(nib_lo[base]) & 0xF
+        bytes_out.append((high << 4) | low)
+
+    # Pad to 4 bytes if needed
+    while len(bytes_out) < 4:
+        bytes_out.insert(0, 0)
+
+    # Produce big-endian 4-byte hex
+    return ''.join(f"{b:02x}" for b in bytes_out[:4])
 
 # -----------------------------------------------------------------------------
 # key_scheduling --------------------------------------------------------------
@@ -290,8 +350,14 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
+
+            # ---- Verification against ground truth ----------------------
+            gt_hex = WI_HEX_I4_TO_I43[i - 4]
+            got_hex = _extract_word_hex(engine_context, xor_hi, xor_lo)
+            print(f"W[{i}] match: {got_hex == gt_hex} (got={got_hex}, gt={gt_hex})")
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
+            
         else:
             start_time = time.time()
             # 4의 배수 x - 4의 배수 -1 번째 워드와 4의 배수 - 3 번째 워드를 xor 연산
@@ -303,6 +369,11 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             xor_hi, xor_lo = _xor(engine_context, word_hi_i_minus_1, word_lo_i_minus_1, word_hi_i_minus_3, word_lo_i_minus_3)
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
+
+            # ---- Verification ------------------------------------------
+            gt_hex = WI_HEX_I4_TO_I43[i - 4]
+            got_hex = _extract_word_hex(engine_context, xor_hi, xor_lo)
+            print(f"W[{i}] match: {got_hex == gt_hex} (got={got_hex}, gt={gt_hex})")
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
     return word_hi, word_lo
