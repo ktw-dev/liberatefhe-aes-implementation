@@ -1,6 +1,3 @@
-from __future__ import annotations
-from aes_transform_zeta import int_to_zeta, zeta_to_int
-import time
 """
 aes-key-scheduling explanation
 
@@ -29,18 +26,17 @@ RconXOR Operation - Step by Step:
 XOR operation - Step by Step:
 """
 
+from __future__ import annotations
+from aes_transform_zeta import int_to_zeta, zeta_to_int
+import time
 import numpy as np
-from typing import Tuple
-import importlib.util
-import pathlib
 from engine_context import CKKS_EngineContext
 from aes_SubBytes import sub_bytes
+from aes_xor import xor_operation as _xor_operation
 
 # -----------------------------------------------------------------------------
 # Dynamic import helpers (copied from aes-main-process) ------------------------
 # -----------------------------------------------------------------------------
-
-_THIS_DIR = pathlib.Path(__file__).resolve().parent
 
 AES_RCON = np.array([
     0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
@@ -52,21 +48,6 @@ aes_rcon_hi = np.array([
 aes_rcon_lo = np.array([
     0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0, 0xb, 0x6
 ], dtype=np.uint8)
-
-def _load_module(fname: str, alias: str):
-    """Load a Python file in the current directory as a module with *alias*."""
-    path = _THIS_DIR / fname
-    spec = importlib.util.spec_from_file_location(alias, path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Cannot load {fname}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    return module
-
-# Dynamically load `aes-xor.py` as module alias `aes_xor`
-_aes_xor_mod = _load_module("aes_xor.py", "aes_xor")
-_xor_operation = _aes_xor_mod._xor_operation
-
 
 # Round constants for AES key expansion (Rcon)
 AES_RCON = np.array([
@@ -81,6 +62,9 @@ __all__ = [
     "generate_round_keys_flat"
 ]
 
+# -----------------------------------------------------------------------------
+# _rot_word ------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     """Apply RotWord operation to the first 4 word (bytes 0-3) of flat key array.
@@ -104,36 +88,67 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # load engine and keys
     engine = engine_context.get_engine()
     
-    # ------------------------------Masking------------------------------
-    key_mask_0_0_plain = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
-    key_mask_0_123_plain = np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
+    t_minus_1_word_hi = enc_key_hi.copy()
+    t_minus_1_word_lo = enc_key_lo.copy()
     
-    key_mask_hi_0_0 = engine.multiply(enc_key_hi, key_mask_0_0_plain)
-    key_mask_hi_0_123 = engine.multiply(enc_key_hi, key_mask_0_123_plain)
-    
-    key_mask_lo_0_0 = engine.multiply(enc_key_lo, key_mask_0_0_plain)
-    key_mask_lo_0_123 = engine.multiply(enc_key_lo, key_mask_0_123_plain)
-        
     # ------------------------------Rotating------------------------------
-    rotated_hi_0_to_3 = engine.rotate(key_mask_hi_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
-    rotated_hi_123_to_012 = engine.rotate(key_mask_hi_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
-
-    rotated_lo_0_to_3 = engine.rotate(key_mask_lo_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
-    rotated_lo_123_to_012 = engine.rotate(key_mask_lo_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
-
-    rotated_hi = engine.multiply(rotated_hi_0_to_3, rotated_hi_123_to_012, engine_context.get_relinearization_key())
-    rotated_lo = engine.multiply(rotated_lo_0_to_3, rotated_lo_123_to_012, engine_context.get_relinearization_key())
+    rotated_word_hi = engine.rotate(t_minus_1_word_hi, engine_context.get_fixed_rotation_key(4 * 2048))
+    rotated_word_lo = engine.rotate(t_minus_1_word_lo, engine_context.get_fixed_rotation_key(4 * 2048))
     
-    rotated_hi = engine.bootstrap(rotated_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    rotated_lo = engine.bootstrap(rotated_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-
-    return rotated_hi, rotated_lo
+    # ------------------------------Masking------------------------------
+    key_mask_0_0 = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
+    key_mask_0_123 = np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
     
+    key_mask_hi_0_0 = engine.multiply(rotated_word_hi, key_mask_0_0)
+    key_mask_hi_0_123 = engine.multiply(rotated_word_hi, key_mask_0_123)
+    
+    key_mask_lo_0_0 = engine.multiply(rotated_word_lo, key_mask_0_0)
+    key_mask_lo_0_123 = engine.multiply(rotated_word_lo, key_mask_0_123)
+    
+    # ------------------------------Rotating------------------------------
+    rot_key_0_3_hi = engine.rotate(key_mask_hi_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
+    rot_key_0_3_lo = engine.rotate(key_mask_lo_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
+    
+    rot_key_123_012_hi = engine.rotate(key_mask_hi_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
+    rot_key_123_012_lo = engine.rotate(key_mask_lo_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
+    
+    # ------------------------------Concatenating------------------------------
+    rot_key_0_hi = engine.multiply(rot_key_0_3_hi, rot_key_123_012_hi, engine_context.get_relinearization_key())
+    rot_key_0_lo = engine.multiply(rot_key_0_3_lo, rot_key_123_012_lo, engine_context.get_relinearization_key())
+    
+    # ------------------------------Bootstrap------------------------------
+    rot_key_0_hi = engine.bootstrap(rot_key_0_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rot_key_0_lo = engine.bootstrap(rot_key_0_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    return rot_key_0_hi, rot_key_0_lo
 
+# -----------------------------------------------------------------------------
+# _sub_word ------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+    engine = engine_context.get_engine()
+    
+    masks = np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)])
+    
     sub_bytes_hi, sub_bytes_lo = sub_bytes(engine_context, enc_key_hi, enc_key_lo)
+    
+    # ------------------------------Masking------------------------------
+    sub_bytes_hi = engine.multiply(sub_bytes_hi, masks)
+    sub_bytes_lo = engine.multiply(sub_bytes_lo, masks)
+    
+    # ------------------------------Bootstrap------------------------------
+    sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    sub_bytes_lo = engine.bootstrap(sub_bytes_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    sub_bytes_hi = engine.intt(sub_bytes_hi)
+    sub_bytes_lo = engine.intt(sub_bytes_lo)
+    
     return sub_bytes_hi, sub_bytes_lo
+
+# -----------------------------------------------------------------------------
+# _rcon_xor ------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_num: int):
     """Apply Rcon XOR to the first byte of the key.
@@ -152,38 +167,24 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     result_lo : Ciphertext
     """
     engine = engine_context.get_engine()
-    public_key = engine_context.get_public_key()
     
-    max_blocks = 2048
+    rcon_hi = AES_RCON[round_num]
+    rcon_lo = AES_RCON[round_num]
     
-    # Create Rcon mask - only first byte position
-    first_byte_mask = np.concatenate([np.ones(max_blocks), np.zeros(15 * max_blocks)])
+    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi)
+    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo)
     
-    # Get Rcon value and transform to zeta
-    rcon_value = AES_RCON[round_num]
-    rcon_hi = (rcon_value >> 4) & 0x0F
-    rcon_lo = rcon_value & 0x0F
+    rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rcon_xor_lo = engine.bootstrap(rcon_xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
-    # Transform to zeta representation
-    rcon_zeta_hi = int_to_zeta(np.full(16 * max_blocks, rcon_hi))
-    rcon_zeta_lo = int_to_zeta(np.full(16 * max_blocks, rcon_lo))
+    rcon_xor_hi = engine.intt(rcon_xor_hi)
+    rcon_xor_lo = engine.intt(rcon_xor_lo)
     
-    # Apply mask to Rcon
-    rcon_zeta_hi_masked = rcon_zeta_hi * first_byte_mask
-    rcon_zeta_lo_masked = rcon_zeta_lo * first_byte_mask
-    
-    # Encode as plaintext
-    rcon_plain_hi = engine.encrypt(rcon_zeta_hi_masked, public_key)
-    rcon_plain_lo = engine.encrypt(rcon_zeta_lo_masked, public_key)
-    
-    # XOR with key using plaintext-ciphertext addition
-    result_hi = _xor_operation(engine_context, enc_key_hi, rcon_plain_hi)
-    result_lo = _xor_operation(engine_context, enc_key_lo, rcon_plain_lo)
-    
-    result_hi = engine.bootstrap(result_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    result_lo = engine.bootstrap(result_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    
-    return result_hi, result_lo
+    return rcon_xor_hi, rcon_xor_lo
+
+# -----------------------------------------------------------------------------
+# _xor -----------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi, xor_key_lo):
     engine = engine_context.get_engine()
@@ -192,7 +193,15 @@ def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi,
     
     xor_hi = engine.bootstrap(xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     xor_lo = engine.bootstrap(xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    xor_hi = engine.intt(xor_hi)
+    xor_lo = engine.intt(xor_lo)
+    
     return xor_hi, xor_lo
+
+# -----------------------------------------------------------------------------
+# key_scheduling --------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     """
@@ -270,17 +279,22 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
         else:
             start_time = time.time()
             # 4의 배수 x - 4의 배수 -1 번째 워드와 4의 배수 - 3 번째 워드를 xor 연산
-            xor_hi, xor_lo = _xor(engine_context, word_hi[i-1], word_lo[i-1], word_hi[i-4], word_lo[i-4])
+            word_hi_i_minus_1 = engine.rotate(word_hi[i-1], engine_context.get_fixed_rotation_key(4 * 2048))
+            word_lo_i_minus_1 = engine.rotate(word_lo[i-1], engine_context.get_fixed_rotation_key(4 * 2048))
+            word_hi_i_minus_3 = word_hi[i-4]
+            word_lo_i_minus_3 = word_lo[i-4]
+            
+            xor_hi, xor_lo = _xor(engine_context, word_hi_i_minus_1, word_lo_i_minus_1, word_hi_i_minus_3, word_lo_i_minus_3)
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
     return word_hi, word_lo
     
-    
+# -----------------------------------------------------------------------------
     
 if __name__ == "__main__":
-    from aes_main_process import engine_initiation, fixed_key_initiation
+    from aes_main_process import engine_initiation, key_initiation_fixed
     from aes_transform_zeta import zeta_to_int
     delta = [1 * 2048, 2 * 2048, 3 * 2048, 4 * 2048, 5 * 2048, 6 * 2048, 7 * 2048, 8 * 2048, 9 * 2048, 10 * 2048, 11 * 2048, 12 * 2048, 13 * 2048, 14 * 2048, 15 * 2048]
     engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta) 
@@ -288,45 +302,39 @@ if __name__ == "__main__":
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
     
-    key_zeta_hi, key_zeta_lo = fixed_key_initiation()
+    key_zeta_hi, key_zeta_lo = key_initiation_fixed()
     
-    max_blocks = 2048
+    enc_key_hi_list = []
+    enc_key_lo_list = []
+    
+    mask_row_0 = np.concatenate(np.ones(4 * 2048, dtype=np.uint8), np.zeros(12 * 2048, dtype=np.uint8))
+    mask_row_1 = np.concatenate(np.zeros(4 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(8 * 2048, dtype=np.uint8))
+    mask_row_2 = np.concatenate(np.zeros(8 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8), np.zeros(4 * 2048, dtype=np.uint8))
+    mask_row_3 = np.concatenate(np.zeros(12 * 2048, dtype=np.uint8), np.ones(4 * 2048, dtype=np.uint8))    
+    
+    row_hi_0 = engine.multiply(key_zeta_hi, mask_row_0)
+    row_hi_1 = engine.multiply(key_zeta_hi, mask_row_1)
+    row_hi_2 = engine.multiply(key_zeta_hi, mask_row_2)
+    row_hi_3 = engine.multiply(key_zeta_hi, mask_row_3)
+    
+    row_lo_0 = engine.multiply(key_zeta_lo, mask_row_0)
+    row_lo_1 = engine.multiply(key_zeta_lo, mask_row_1)
+    row_lo_2 = engine.multiply(key_zeta_lo, mask_row_2)
+    row_lo_3 = engine.multiply(key_zeta_lo, mask_row_3)
 
-    # 키 마스킹
-    key_mask_0 = np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)])
-    key_mask_1 = np.concatenate([np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)])
-    key_mask_2 = np.concatenate([np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)])
-    key_mask_3 = np.concatenate([np.zeros(12 * 2048), np.ones(4 * 2048)])
+    enc_key_hi_list.append(row_hi_0)
+    enc_key_hi_list.append(row_hi_1)
+    enc_key_hi_list.append(row_hi_2)
+    enc_key_hi_list.append(row_hi_3)
     
-    key_word_0_hi = key_upper * key_mask_0
-    key_word_1_hi = np.roll(key_upper * key_mask_1, -4 * 2048)
-    key_word_2_hi = np.roll(key_upper * key_mask_2, -8 * 2048)
-    key_word_3_hi = np.roll(key_upper * key_mask_3, -12 * 2048)
-    
-    key_word_0_lo = key_lower * key_mask_0
-    key_word_1_lo = np.roll(key_upper * key_mask_1, -4 * 2048)
-    key_word_2_lo = np.roll(key_upper * key_mask_2, -8 * 2048)
-    key_word_3_lo = np.roll(key_upper * key_mask_3, -12 * 2048)
-    
-    # 1. 키 암호화
-    enc_key_word_hi_0 = engine.encrypt(key_word_0_hi, public_key)
-    enc_key_word_lo_0 = engine.encrypt(key_word_0_lo, public_key)
-        
-    enc_key_word_hi_1 = engine.encrypt(key_word_1_hi, public_key)
-    enc_key_word_lo_1 = engine.encrypt(key_word_1_lo, public_key)
-
-    enc_key_word_hi_2 = engine.encrypt(key_word_2_hi, public_key)
-    enc_key_word_lo_2 = engine.encrypt(key_word_2_lo, public_key)
-
-    enc_key_word_hi_3 = engine.encrypt(key_word_3_hi, public_key)
-    enc_key_word_lo_3 = engine.encrypt(key_word_3_lo, public_key)
-    
-    enc_key_word_hi_list = [enc_key_word_hi_0, enc_key_word_hi_1, enc_key_word_hi_2, enc_key_word_hi_3]
-    enc_key_word_lo_list = [enc_key_word_lo_0, enc_key_word_lo_1, enc_key_word_lo_2, enc_key_word_lo_3]
+    enc_key_lo_list.append(row_lo_3)
+    enc_key_lo_list.append(row_lo_0)
+    enc_key_lo_list.append(row_lo_1)
+    enc_key_lo_list.append(row_lo_2)
     
     print("Key scheduling start")
     start_time = time.time()
-    key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_word_hi_list, enc_key_word_lo_list)
+    key_hi_list, key_lo_list = key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list)
     end_time = time.time()
     print(f"Key scheduling time: {end_time - start_time} seconds")
     

@@ -175,7 +175,7 @@ def key_initiation_fixed(*, max_blocks: int = 2048) -> Tuple[np.ndarray, np.ndar
 # Key Scheduling --------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-def key_scheduling(engine_context, enc_key_hi, enc_key_lo):
+def _key_scheduling(engine_context, enc_key_hi, enc_key_lo):
     
     enc_key_hi_list = []
     enc_key_lo_list = []
@@ -358,7 +358,7 @@ if __name__ == "__main__":
     wait_next_stage("data/key HE-encryption", "key Scheduling")
     
     # --- Fixedkey Scheduling stage -------------------------------------------------
-    enc_key_hi_list, enc_key_lo_list = key_scheduling(engine_context, enc_key_hi, enc_key_lo)
+    enc_key_hi_list, enc_key_lo_list = _key_scheduling(engine_context, enc_key_hi, enc_key_lo)
 
     # DEBUG
     # print(enc_key_hi_list)
