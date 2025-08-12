@@ -42,25 +42,6 @@ from aes_SubBytes import sub_bytes as _sub_bytes
 from aes_ShiftRows import shift_rows as _shift_rows
 from aes_MixColumns import mix_columns as _mix_columns
 
-
-
-# -----------------------------------------------------------------------------
-# Dynamic import helpers -------------------------------------------------------
-# -----------------------------------------------------------------------------
-
-_THIS_DIR = pathlib.Path(__file__).resolve().parent
-
-
-def _load_module(fname: str, alias: str):
-    """Load a Python file in the current directory as a module with *alias*."""
-    path = _THIS_DIR / fname
-    spec = importlib.util.spec_from_file_location(alias, path)
-    if spec is None or spec.loader is None:  # pragma: no cover
-        raise ImportError(f"Cannot load {fname}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    return module
-
 # -----------------------------------------------------------------------------
 # Engine Initiation ------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -165,6 +146,8 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
     key_zeta_lower = int_to_zeta(key_lower)
 
     return key, key_flat, key_upper, key_lower, key_zeta_upper, key_zeta_lower
+
+# -----------------------------------------------------------------------------
 
 def key_initiation_fixed(*, max_blocks: int = 2048) -> Tuple[np.ndarray, np.ndarray]:
     """Generate a fixed AES-128 key and prepare its flat & nibble arrays.
