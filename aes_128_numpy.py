@@ -236,7 +236,7 @@ def make_simd_round_key_vector(
     round_key: np.ndarray,
     slots_per_byte: int = 1 << 11,
     as_column: bool = False,
-    as_hex: bool = True,
+    as_hex: bool = False,
 ) -> np.ndarray:
     """Create a SIMD layout where each of the 16 bytes is repeated ``slots_per_byte`` times.
 
@@ -263,7 +263,7 @@ def make_simd_round_key_vector(
     if round_key.shape != (4, 4):
         raise ValueError("round_key must be a 4x4 matrix of dtype uint8")
 
-    rk_bytes = round_key.astype(np.uint8).ravel(order="C")  # column-major order
+    rk_bytes = round_key.astype(np.uint8).ravel(order="C")  # row-major order
     if rk_bytes.size != 16:
         raise ValueError("round_key must contain exactly 16 bytes")
 
@@ -283,7 +283,7 @@ def make_all_simd_round_key_vectors(
     key: bytes,
     slots_per_byte: int = 1 << 11,
     as_column: bool = False,
-    as_hex: bool = True,
+    as_hex: bool = False,
 ) -> np.ndarray:
     """Compute all 11 round keys and pack each into a SIMD vector per the requested layout.
 

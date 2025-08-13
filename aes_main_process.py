@@ -105,6 +105,8 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
 
     # 1. Generate random data-blocks
     blocks = rng.integers(0, 256, size=(num_blocks, 16), dtype=np.uint8)
+    
+    print("blocks: ", blocks)
 
     # 2. Flatten to 1-D array following batching layout
     flat = blocks_to_flat_array(blocks)
