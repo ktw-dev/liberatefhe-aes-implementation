@@ -22,7 +22,7 @@ import pathlib
 import importlib.util
 import numpy as np
 import time
-from typing import Tuple
+from typing import Tuple, List, Any
 
 # import custom modules
 from engine_context import CKKS_EngineContext
@@ -105,6 +105,8 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
 
     # 1. Generate random data-blocks
     blocks = rng.integers(0, 256, size=(num_blocks, 16), dtype=np.uint8)
+    
+    print("blocks: ", blocks)
 
     # 2. Flatten to 1-D array following batching layout
     flat = blocks_to_flat_array(blocks)
@@ -170,6 +172,53 @@ def key_initiation_fixed(*, max_blocks: int = 2048) -> Tuple[np.ndarray, np.ndar
     key_zeta_lower = int_to_zeta(key_lower)
 
     return key_zeta_upper, key_zeta_lower
+
+# -----------------------------------------------------------------------------
+# demo Key Scheduling ---------------------------------------------------------
+# -----------------------------------------------------------------------------
+from aes_128_numpy import make_all_simd_round_key_vectors
+def demo_key_scheduling(engine_context: CKKS_EngineContext | None = None) -> Tuple[List[Any], List[Any]]:
+    """Generate SIMD-batched round keys, map to ζ-domain per nibble, and encrypt.
+
+    Returns
+    -------
+    enc_round_keys_upper : list
+        List of 11 ciphertexts encrypting ζ^(upper nibble) for each round key.
+    enc_round_keys_lower : list
+        List of 11 ciphertexts encrypting ζ^(lower nibble) for each round key.
+    """
+    # Ensure we have an engine context
+    if engine_context is None:
+        assert False, "engine_context is required"
+
+    engine = engine_context.get_engine()
+    public_key = engine_context.get_public_key()
+
+    # 1) Build row-major SIMD arrays (11, 32768) as uint8
+    r_key_list = make_all_simd_round_key_vectors(
+        bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c"),
+        2048
+    )
+
+    # 2) Split to nibbles
+    upper = ((r_key_list >> 4) & 0x0F).astype(np.uint8)  # (11, 32768)
+    lower = (r_key_list & 0x0F).astype(np.uint8)         # (11, 32768)
+
+    # 3) Map to ζ-domain
+    zeta_upper = int_to_zeta(upper)
+    zeta_lower = int_to_zeta(lower)
+
+    # 4) Encrypt per round
+    enc_upper: List[Any] = []
+    enc_lower: List[Any] = []
+    for r in range(11):
+        ct_u = engine.encrypt(zeta_upper[r], public_key, level=10)
+        ct_l = engine.encrypt(zeta_lower[r], public_key, level=10)
+        enc_upper.append(ct_u)
+        enc_lower.append(ct_l)
+
+    return enc_upper, enc_lower
+
 
 # -----------------------------------------------------------------------------
 # Key Scheduling --------------------------------------------------------------
@@ -323,23 +372,14 @@ if __name__ == "__main__":
 
     wait_next_stage("Data initiation", "key initiation")
 
-    # # --- Key initiation stage -------------------------------------------------
-    # key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
-
-    # # DEBUG
-    # # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
-
-    # # print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
-    # # print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
-
-    # --- Fixed key initiation stage -------------------------------------------------
-    key_zeta_hi, key_zeta_lo = key_initiation_fixed()
+    # --- Key initiation stage -------------------------------------------------
+    key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
 
     # DEBUG
+    # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
+
     # print("ζ(key upper)[0-3]       :", [f"{c:.2f}" for c in key_zeta_hi[:4]])
     # print("ζ(key lower)[0-3]       :", [f"{c:.2f}" for c in key_zeta_lo[:4]])
-
-    wait_next_stage("Key initiation", "data/key HE-encryption")
     
     # --- data/key HE-encryption stage ------------------------------------------------
     
@@ -356,14 +396,10 @@ if __name__ == "__main__":
     # print(enc_data_lo)
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
-    
-    # --- Fixedkey Scheduling stage -------------------------------------------------
-    enc_key_hi_list, enc_key_lo_list = _key_scheduling(engine_context, enc_key_hi, enc_key_lo)
 
-    # DEBUG
-    # print(enc_key_hi_list)
-    # print(enc_key_lo_list)
-
+    # ==== 이 부분은 미완성인 키 스케쥴링을 대체하기 위한 함수입니다 ====
+    # === demo key scheduling =================================================
+    enc_key_hi_list, enc_key_lo_list = demo_key_scheduling(engine_context)    
 
     wait_next_stage("key Scheduling", "encryption stage")
     
