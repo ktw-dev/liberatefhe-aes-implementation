@@ -264,8 +264,8 @@ def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
     dec_lo = engine.decrypt(ct_lo, sk)
 
     # Map zeta to integers 0..15, and zero-out tiny numerical noise
-    nib_hi = zeta_to_int(dec_hi)
-    nib_lo = zeta_to_int(dec_lo)
+    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
+    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
 
     # Find blocks carrying data. Expect 4 blocks for a word.
     idxs_hi = set(_blocks_nonzero_indices(nib_hi))
@@ -407,6 +407,10 @@ if __name__ == "__main__":
     public_key = engine_context.get_public_key()
     
     key_zeta_hi, key_zeta_lo = key_initiation_fixed()
+    
+    # DEBUG
+    print(zeta_to_int(key_zeta_hi).astype(np.uint8)[:16])
+    print(zeta_to_int(key_zeta_lo).astype(np.uint8)[:16])
     
     key_zeta_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
     key_zeta_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
