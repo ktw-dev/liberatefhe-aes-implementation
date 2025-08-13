@@ -353,6 +353,63 @@ def wait_next_stage(stage: str, next_stage: str, delay: float = 1.0) -> None:
     print("\n")
 
 
+def verify_round_output(
+    engine_context: CKKS_EngineContext,
+    ct_hi,
+    ct_lo,
+    ground_truth: np.ndarray | list[int],
+    *,
+    label: str = "",
+    mode: str = "demo"
+) -> bool:
+    """Decrypt *ct_hi/ct_lo*, reconstruct bytes, and compare with *ground_truth*.
+
+    Parameters
+    ----------
+    engine_context : CKKS_EngineContext
+        Context holding engine & secret key.
+    ct_hi, ct_lo : Ciphertext
+        CKKS ciphertexts holding ζ^(upper nibble) / ζ^(lower nibble) values.
+    ground_truth : array-like, length 16
+        Expected 16-byte block (row-major order).
+    label : str, optional
+        Name of the stage for logging.
+
+    Returns
+    -------
+    bool
+        True if all 16 bytes match ground truth, else False.
+    """
+    if mode == "practice":
+        return None
+    
+    engine = engine_context.get_engine()
+    sk = engine_context.get_secret_key()
+
+    gt = np.asarray(ground_truth, dtype=np.uint8).reshape(16)
+
+    # Decrypt & convert back to ints 0..15 per nibble
+    dec_hi = engine.decrypt(ct_hi, sk)
+    dec_lo = engine.decrypt(ct_lo, sk)
+    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
+    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
+
+    # Combine hi/lo nibbles and sample every 2048-slot block
+    slot_stride = 2048
+    combined_bytes = ((nib_hi[0::slot_stride] << 4) | nib_lo[0::slot_stride]).astype(np.uint8)
+
+    passed = np.array_equal(combined_bytes[:16], gt)
+
+    report_label = f"[{label}] " if label else ""
+    if passed:
+        print(f"✓ {report_label}verification passed")
+    else:
+        print(f"⚠️  {report_label}mismatch – needs review")
+        print("  expected:", [f"{b:02x}" for b in gt])
+        print("  got     :", [f"{b:02x}" for b in combined_bytes[:16]])
+    return passed
+
+
 # -----------------------------------------------------------------------------
 # Demo / manual test -----------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -445,6 +502,8 @@ if __name__ == "__main__":
     enc_data_lo_round_1 = AddRoundKey(engine_context, enc_data_lo, enc_key_lo_list[0])
     end_time = time.time()
     print(f"addkey complete!!! Time taken: {(end_time - start_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0x2b, 0x28, 0xab, 0x09, 0x7e, 0xae, 0xf7, 0xcf, 0x15, 0xd2, 0x15, 0x4f, 0x16, 0xa6, 0x88, 0x3c], mode=mode_choice)
         
     # --- Round 1 --------------------------------------------------------------
     start_time = time.time()
@@ -454,6 +513,8 @@ if __name__ == "__main__":
     enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
     sub_e_time = time.time()
     print(f"sub_bytes complete!!! Time taken: {sub_e_time - sub_s_time} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, enc_key_hi_list[0], enc_key_lo_list[0], mode=mode_choice)
     
     shift_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
