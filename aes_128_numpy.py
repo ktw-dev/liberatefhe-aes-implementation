@@ -232,6 +232,80 @@ def key_expansion(key: bytes) -> np.ndarray:
 
 
 # 4. Main Encryption/Decryption Functions
+def make_simd_round_key_vector(
+    round_key: np.ndarray,
+    slots_per_byte: int = 1 << 11,
+    as_column: bool = False,
+    as_hex: bool = True,
+) -> np.ndarray:
+    """Create a SIMD layout where each of the 16 bytes is repeated ``slots_per_byte`` times.
+
+    Output order uses row-major byte order (NumPy default display order) for the 16 bytes, and
+    each byte value is repeated contiguously ``slots_per_byte`` times. By default this
+    returns a 1D vector of shape (16 * slots_per_byte,), i.e., (32768,) when slots_per_byte
+    is 2048.
+
+    Parameters
+    ----------
+    round_key: np.ndarray
+        A 4x4 uint8 matrix representing a single AES round key.
+    slots_per_byte: int
+        Number of repeats per byte (default 2**11 = 2048). Total length will be 16 * slots_per_byte.
+    as_column: bool
+        If True, returns shape (16 * slots_per_byte, 1); otherwise returns (16 * slots_per_byte,).
+
+    Returns
+    -------
+    np.ndarray
+        Array with the requested shape containing the repeated bytes. If ``as_hex`` is True,
+        returns a string array (e.g., values like "0x2b"); otherwise returns uint8 values.
+    """
+    if round_key.shape != (4, 4):
+        raise ValueError("round_key must be a 4x4 matrix of dtype uint8")
+
+    rk_bytes = round_key.astype(np.uint8).ravel(order="C")  # column-major order
+    if rk_bytes.size != 16:
+        raise ValueError("round_key must contain exactly 16 bytes")
+
+    chunks = [np.full((slots_per_byte,), byte, dtype=np.uint8) for byte in rk_bytes]
+    simd_vec_uint8 = np.concatenate(chunks, axis=0)
+    if as_hex:
+        # Format as lowercase hex with 0x prefix and two digits
+        simd_vec = np.array([f"0x{b:02x}" for b in simd_vec_uint8.tolist()], dtype=np.str_)
+    else:
+        simd_vec = simd_vec_uint8
+    if as_column:
+        simd_vec = simd_vec.reshape(-1, 1)
+    return simd_vec
+
+
+def make_all_simd_round_key_vectors(
+    key: bytes,
+    slots_per_byte: int = 1 << 11,
+    as_column: bool = False,
+    as_hex: bool = True,
+) -> np.ndarray:
+    """Compute all 11 round keys and pack each into a SIMD vector per the requested layout.
+
+    Parameters
+    ----------
+    key: bytes
+        16-byte AES-128 key.
+    slots_per_byte: int
+        Repeats per byte. Total length per vector is 16 * slots_per_byte.
+    as_column: bool
+        If True, each vector shape is (16 * slots_per_byte, 1) else (16 * slots_per_byte,).
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape (11, 16 * slots_per_byte, 1) if as_column else (11, 16 * slots_per_byte).
+        Dtype is string (hex formatted) if ``as_hex`` is True; otherwise uint8.
+    """
+    round_keys = key_expansion(key)
+    vectors = [make_simd_round_key_vector(rk, slots_per_byte, as_column, as_hex) for rk in round_keys]
+    return np.stack(vectors, axis=0)
+
 def encrypt(plaintext: bytes, key: bytes) -> bytes:
     """Encrypt 128-bit plaintext with 128-bit key."""
     # Generate round keys
@@ -286,6 +360,12 @@ def decrypt(ciphertext: bytes, key: bytes) -> bytes:
 
 
 # 5. Execution and Validation Code
+def _array_uint8_to_hex(arr: np.ndarray, prefix: str = "0x") -> np.ndarray:
+    """Convert a uint8 ndarray to same-shaped ndarray of hex strings (e.g., "0x2b")."""
+    arr_uint8 = arr.astype(np.uint8, copy=False)
+    flat = arr_uint8.reshape(-1)
+    hex_flat = np.array([f"{prefix}{b:02x}" for b in flat], dtype=np.str_)
+    return hex_flat.reshape(arr_uint8.shape)
 def _run_test_vector(test_name: str, key: bytes, plaintext: bytes, expected: bytes):
     """Helper function to run and validate a single test case."""
     print(f"\n--- Running Test: {test_name} ---")
@@ -324,5 +404,26 @@ if __name__ == '__main__':
         plaintext=bytes.fromhex("00112233445566778899aabbccddeeff"),
         expected=bytes.fromhex("69c4e0d86a7b0430d8cdb78070b4c55a")
     )
+    
+    round_keys = key_expansion(bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c"))
+    print(_array_uint8_to_hex(round_keys))
+    
+    r_key_list = make_all_simd_round_key_vectors(bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c"), 2048)
+    print(r_key_list[1][0])
+    print(r_key_list[1][2048])
+    print(r_key_list[1][4096])
+    print(r_key_list[1][6144])
+    print(r_key_list[1][8192])
+    print(r_key_list[1][10240])
+    print(r_key_list[1][12288])
+    print(r_key_list[1][14336])
+    print(r_key_list[1][16384])
+    print(r_key_list[1][18432])
+    print(r_key_list[1][20480])
+    print(r_key_list[1][22528])
+    print(r_key_list[1][24576])
+    print(r_key_list[1][26624])
+    print(r_key_list[1][28672])
+    print(r_key_list[1][30720])
 
     print("\n\n✓ All AES-128 test vectors successfully validated!")

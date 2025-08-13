@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Tuple, Dict
+import numpy as np
 
 
 # -----------------------------------------------------------------------------
@@ -255,6 +256,36 @@ __all__ = [
     "get_round_keys",
     "as_table",
     "get_wi_hex_i4_to_i43",
+]
+
+
+# -----------------------------------------------------------------------------
+# SIMD helpers for round keys
+# -----------------------------------------------------------------------------
+
+def round_key_to_simd_vector(key_block: bytes, block_slots: int = 2048) -> np.ndarray:
+    """Expand a 16-byte AES round key into a 1-D SIMD layout of length 2^15.
+
+    The output vector has 16 contiguous blocks, each of length ``block_slots``.
+    The j-th block (0-based) is filled with the j-th byte of ``key_block``.
+    By default ``block_slots`` is 2048, producing a vector of length 32768.
+    """
+    assert len(key_block) == 16
+    out = np.empty(16 * block_slots, dtype=np.uint8)
+    for j in range(16):
+        start = j * block_slots
+        out[start : start + block_slots].fill(key_block[j])
+    return out
+
+
+def get_round_keys_simd(block_slots: int = 2048) -> List[np.ndarray]:
+    """Return all 11 round keys expanded into SIMD vectors (len = 16*block_slots)."""
+    return [round_key_to_simd_vector(rk, block_slots) for rk in ROUND_KEYS]
+
+
+__all__ += [
+    "round_key_to_simd_vector",
+    "get_round_keys_simd",
 ]
 
 
