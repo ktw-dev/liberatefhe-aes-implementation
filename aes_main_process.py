@@ -398,7 +398,7 @@ def verify_round_output(
 
     # Combine hi/lo nibbles and sample every 2048-slot block (first 16 bytes only)
     slot_stride = 2048
-    combined_bytes = ((nib_hi[0::slot_stride] << 4) | nib_lo[0::slot_stride]).astype(np.uint8)[:16]
+    combined_bytes = ((nib_hi[0::slot_stride] << 4) | nib_lo[0::slot_stride]).astype(np.uint8)
     
     print("combined_bytes length: ", len(combined_bytes))
 
