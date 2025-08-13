@@ -387,6 +387,8 @@ def verify_round_output(
     sk = engine_context.get_secret_key()
 
     gt = np.asarray(ground_truth, dtype=np.uint8).reshape(16)
+    
+    print("gt: ", gt)
 
     # Decrypt & convert back to ints 0..15 per nibble
     dec_hi = engine.decrypt(ct_hi, sk)
@@ -394,11 +396,15 @@ def verify_round_output(
     nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
     nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
 
-    # Combine hi/lo nibbles and sample every 2048-slot block
+    # Combine hi/lo nibbles and sample every 2048-slot block (first 16 bytes only)
     slot_stride = 2048
-    combined_bytes = ((nib_hi[0::slot_stride] << 4) | nib_lo[0::slot_stride]).astype(np.uint8)
+    combined_bytes = ((nib_hi[0::slot_stride] << 4) | nib_lo[0::slot_stride]).astype(np.uint8)[:16]
+    
+    print("combined_bytes length: ", len(combined_bytes))
 
-    passed = np.array_equal(combined_bytes[:16], gt)
+    print("combined_bytes: ", combined_bytes)
+
+    passed = np.array_equal(combined_bytes, gt)
 
     report_label = f"[{label}] " if label else ""
     if passed:
@@ -544,9 +550,10 @@ if __name__ == "__main__":
     stop_time = time.time()
     print(f"round 1 complete!!! Time taken: {(stop_time - start_time)} seconds")
     
-    verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0xa0, 0x88, 0x23, 0x2a, 0xfa, 0x54, 0xa3, 0x6c, 0xfe, 0x2c, 0x39, 0x76, 0x17, 0xb1, 0x39, 0x0], mode=mode_choice)
+    verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0xa0, 0x88, 0x23, 0x2a, 0xfa, 0x54, 0xa3, 0x6c, 0xfe, 0x2c, 0x39, 0x76, 0x17, 0xb1, 0x39, 0x05], mode=mode_choice)
     
     # --- Round 2 --------------------------------------------------------------
+    r2_time = time.time()
     enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
     enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
@@ -563,6 +570,10 @@ if __name__ == "__main__":
     enc_data_lo_round_3 = AddRoundKey(engine_context, enc_data_lo_round_2, enc_key_lo_list[2])
     enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
     enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
+    r2_e_time = time.time()
+    print(f"round 2 complete!!! Time taken: {(r2_e_time - r2_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_3, enc_data_lo_round_3, ground_truth= [0xf2, 0x7a, 0x59, 0x73, 0xc2, 0x96, 0x35, 0x59, 0x95, 0xb9, 0x80, 0xf6, 0xf2, 0x43, 0x7a, 0x7f], mode=mode_choice)
     
     # --- Round 3 --------------------------------------------------------------
     enc_data_hi_round_3, enc_data_lo_round_3 = sub_bytes(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
