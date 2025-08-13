@@ -42,6 +42,9 @@ from aes_SubBytes import sub_bytes as _sub_bytes
 from aes_ShiftRows import shift_rows as _shift_rows
 from aes_MixColumns import mix_columns as _mix_columns
 
+# demo modules
+from aes_128_numpy import make_all_simd_round_key_vectors
+
 # -----------------------------------------------------------------------------
 # Engine Initiation ------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -121,6 +124,49 @@ def data_initiation(num_blocks: int, *, rng: np.random.Generator | None = None
     return blocks, flat, upper, lower, zeta_upper, zeta_lower
 
 # -----------------------------------------------------------------------------
+# Data initiation demo --------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Prepare initial plaintext data arrays for FHE-AES pipeline.
+
+    Parameters
+    ----------
+    num_blocks : int
+        Number of AES 16-byte state blocks to generate (0 ≤ N ≤ 2048).
+
+    Returns
+    -------
+    blocks : (N,16) uint8 ndarray
+        Raw random blocks (row-major).
+    flat   : (16*2048,) uint8 ndarray
+        Padded & flattened block array suitable for batching.
+    upper  : (16*2048,) uint8 ndarray
+        Upper nibbles (hi) of *flat*.
+    lower  : (16*2048,) uint8 ndarray
+        Lower nibbles (lo) of *flat*.
+    zeta_upper : (16*2048,) complex128 ndarray
+        ζ^(upper) values.
+    zeta_lower : (16*2048,) complex128 ndarray
+        ζ^(lower) values.
+    """
+    # 1. Generate random data-blocks
+    blocks = np.array([0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34], dtype=np.uint8)
+    
+    print("blocks: ", blocks)
+
+    # 2. Flatten to 1-D array following batching layout
+    flat = blocks_to_flat_array(blocks)
+
+    # 3. Split each byte into upper / lower 4-bit nibbles
+    upper, lower = split_to_nibbles(flat)
+
+    # 4. ζ-변환 (SIMD-style) – repeatable vectorized op
+    zeta_upper = int_to_zeta(upper)
+    zeta_lower = int_to_zeta(lower)
+
+    return zeta_upper, zeta_lower
+# -----------------------------------------------------------------------------
 # Key initiation --------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
@@ -150,33 +196,9 @@ def key_initiation(*, rng: np.random.Generator | None = None, max_blocks: int = 
     return key, key_flat, key_upper, key_lower, key_zeta_upper, key_zeta_lower
 
 # -----------------------------------------------------------------------------
-
-def key_initiation_fixed(*, max_blocks: int = 2048) -> Tuple[np.ndarray, np.ndarray]:
-    """Generate a fixed AES-128 key and prepare its flat & nibble arrays.
-    
-    Each index of the 16-byte key is repeated 2048 times to create a total array
-    of size 32768 (16 * 2048).
-
-    Returns
-    -------
-    key_zeta_upper : (16*max_blocks,) complex128 – ζ^upper
-    key_zeta_lower : (16*max_blocks,) complex128 – ζ^lower
-    """
-    key = np.array([0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 
-                         0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c], dtype=np.uint8)
-
-    key_flat = key_to_flat_array(key, max_blocks)
-    key_upper, key_lower = split_to_nibbles(key_flat)
-
-    key_zeta_upper = int_to_zeta(key_upper)
-    key_zeta_lower = int_to_zeta(key_lower)
-
-    return key_zeta_upper, key_zeta_lower
-
-# -----------------------------------------------------------------------------
 # demo Key Scheduling ---------------------------------------------------------
 # -----------------------------------------------------------------------------
-from aes_128_numpy import make_all_simd_round_key_vectors
+
 def demo_key_scheduling(engine_context: CKKS_EngineContext | None = None) -> Tuple[List[Any], List[Any]]:
     """Generate SIMD-batched round keys, map to ζ-domain per nibble, and encrypt.
 
@@ -345,6 +367,13 @@ if __name__ == "__main__":
     # Enforce range 1–2048 inclusive for user input
     if not (1 <= n_blocks <= 2048):
         raise SystemExit("❌  Block count must be between 1 and 2048 inclusive.")
+
+    # --------------------------------------------------------------------
+    # Select operating mode (demo vs practice)
+    # --------------------------------------------------------------------
+    mode_choice = input("Select mode – 'demo' or 'practice': ").strip().lower()
+    if mode_choice not in {"demo", "practice"}:
+        raise SystemExit("❌  Invalid mode; expected 'demo' or 'practice'.")
     
     # --- Engine initiation stage -----------------------------------------------
     
@@ -360,20 +389,20 @@ if __name__ == "__main__":
 
     wait_next_stage("Engine Initiation", "Data initiation")
     
-    # --- Data initiation stage ------------------------------------------------
-    blocks, flat, _, _, data_zeta_hi, data_zeta_lo = data_initiation(n_blocks)
-
-    # DEBUG
-    # print("Generated", len(blocks), "block(s)")
-    # print("First block bytes (hex):", [f"{b:02X}" for b in blocks[0]] if blocks.size else [])
-    # print("Flat array sample (0-15):", [f"{b:02X}" for b in flat[:16]])
-    # print("ζ(upper)[0-3]          :", [f"{c:.2f}" for c in data_zeta_hi[:4]])
-    # print("ζ(lower)[0-3]          :", [f"{c:.2f}" for c in data_zeta_lo[:4]])
-
+    if mode_choice == "practice":
+        # --- Data initiation stage ------------------------------------------------
+        blocks, flat, _, _, data_zeta_hi, data_zeta_lo = data_initiation(n_blocks)
+    else:
+        # --- Data initiation stage ------------------------------------------------
+        data_zeta_hi, data_zeta_lo = data_initiation_demo()
+        
     wait_next_stage("Data initiation", "key initiation")
 
     # --- Key initiation stage -------------------------------------------------
-    key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
+    if mode_choice == "practice":
+        key_bytes, key_flat, key_upper, key_lower, key_zeta_hi, key_zeta_lo = key_initiation()
+    else:
+        print("demo mode don't need key initiation. Only demo key scheduling is available.")
 
     # DEBUG
     # print("Secret key bytes (hex):", [f"{b:02X}" for b in key_bytes])
@@ -388,8 +417,9 @@ if __name__ == "__main__":
     enc_data_lo = engine.encrypt(data_zeta_lo, public_key)
     
     # 2. 키 암호화
-    enc_key_hi = engine.encrypt(key_zeta_hi, public_key)
-    enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
+    if mode_choice == "practice":
+        enc_key_hi = engine.encrypt(key_zeta_hi, public_key)
+        enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
     
     # DEBUG
     # print(enc_data_hi)
@@ -397,9 +427,11 @@ if __name__ == "__main__":
     
     wait_next_stage("data/key HE-encryption", "key Scheduling")
 
-    # ==== 이 부분은 미완성인 키 스케쥴링을 대체하기 위한 함수입니다 ====
-    # === demo key scheduling =================================================
-    enc_key_hi_list, enc_key_lo_list = demo_key_scheduling(engine_context)    
+    # --- key scheduling stage ------------------------------------------------
+    if mode_choice == "practice":
+        enc_key_hi_list, enc_key_lo_list = _key_scheduling(engine_context, key_zeta_hi, key_zeta_lo)    
+    else:
+        enc_key_hi_list, enc_key_lo_list = demo_key_scheduling(engine_context)
 
     wait_next_stage("key Scheduling", "encryption stage")
     
