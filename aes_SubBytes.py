@@ -5,6 +5,12 @@ from typing import Any, Dict, Tuple, List
 
 import numpy as np
 
+# Debug printing control
+DEBUG = False
+def _dbg(*args, **kwargs):
+    if DEBUG:
+        print(*args, **kwargs)
+
 from aes_xor import build_power_basis  # reuse power-basis helper
 from engine_context import CKKS_EngineContext
 
