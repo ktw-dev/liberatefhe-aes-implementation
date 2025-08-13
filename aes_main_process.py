@@ -514,7 +514,7 @@ if __name__ == "__main__":
     sub_e_time = time.time()
     print(f"sub_bytes complete!!! Time taken: {sub_e_time - sub_s_time} seconds")
     
-    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, enc_key_hi_list[0], enc_key_lo_list[0], mode=mode_choice)
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0xd4, 0xe0, 0xb8, 0x1e, 0x27, 0xbf, 0xb4, 0x41, 0x11, 0x98, 0x5d, 0x52, 0xae, 0xf1, 0xe5, 0x30], mode=mode_choice)
     
     shift_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
@@ -523,6 +523,8 @@ if __name__ == "__main__":
     shift_e_time = time.time()
     print(f"shift_rows complete!!! Time taken: {shift_e_time - shift_s_time} seconds")
     
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0xd4, 0xe0, 0xb8, 0x1e, 0xbf, 0xb4, 0x41, 0x27, 0x5d, 0x52, 0x11, 0x98, 0x30, 0xae, 0xf1, 0xe5], mode=mode_choice)
+    
     mix_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
@@ -530,16 +532,19 @@ if __name__ == "__main__":
     mix_e_time = time.time()
     print(f"mix_columns complete!!! Time taken: {mix_e_time - mix_s_time} seconds")
     
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth= [0x04, 0xe0, 0x48, 0x28, 0x66, 0xcb, 0xf8, 0x06, 0x81, 0x19, 0xd3, 0x26, 0xe4, 0x9a, 0x7a, 0x4c], mode=mode_choice)
+    
     addkey_s_time = time.time()
     enc_data_hi_round_2 = AddRoundKey(engine_context, enc_data_hi_round_1, enc_key_hi_list[1])
     enc_data_lo_round_2 = AddRoundKey(engine_context, enc_data_lo_round_1, enc_key_lo_list[1])
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
+    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     addkey_e_time = time.time()
-    print(f"addkey complete!!! Time taken: {addkey_e_time - addkey_s_time} seconds")
-    
+    print(f"addkey complete!!! Time taken: {addkey_e_time - addkey_s_time} seconds")    
     stop_time = time.time()
     print(f"round 1 complete!!! Time taken: {(stop_time - start_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0xa0, 0x88, 0x23, 0x2a, 0xfa, 0x54, 0xa3, 0x6c, 0xfe, 0x2c, 0x39, 0x76, 0x17, 0xb1, 0x39, 0x0], mode=mode_choice)
     
     # --- Round 2 --------------------------------------------------------------
     enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
