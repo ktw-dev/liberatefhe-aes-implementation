@@ -157,6 +157,8 @@ def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
 
     # 2. Flatten to 1-D array following batching layout
     flat = blocks_to_flat_array(blocks)
+    
+    print("flat: ", flat)
 
     # 3. Split each byte into upper / lower 4-bit nibbles
     upper, lower = split_to_nibbles(flat)

@@ -47,8 +47,6 @@ def blocks_to_flat_array(blocks, max_blocks: int = 2048) -> np.ndarray:
     # matrix[:, :n_blocks] = blocks.T
     matrix = blocks.T
     
-    print("column-major matrix: ", matrix)
-
     # Flatten row-wise so each byte position segment is contiguous
     return matrix.reshape(-1)
 
