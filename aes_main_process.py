@@ -163,6 +163,9 @@ def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
     flat = np.repeat(flat_col_major, 2048)
     
     print("flat: ", flat)
+    print("Sample indices (i * 2048):")
+    for i in range(16):
+        print(f"  flat[{i * 2048}] = 0x{flat[i * 2048]}")
 
     # 3. Split each byte into upper / lower 4-bit nibbles
     upper, lower = split_to_nibbles(flat)
