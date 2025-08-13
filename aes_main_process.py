@@ -152,11 +152,15 @@ def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
     """
     # 1. Generate random data-blocks
     blocks = np.array([0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34], dtype=np.uint8)
-    
+
     print("blocks: ", blocks)
 
     # 2. Flatten to 1-D array following batching layout
-    flat = blocks_to_flat_array(blocks)
+    blocks_4x4 = blocks.reshape(4, 4)
+    flat_col_major = blocks_4x4.T.flatten()
+    
+    # Repeat each byte 2048 times
+    flat = np.repeat(flat_col_major, 2048)
     
     print("flat: ", flat)
 
@@ -168,6 +172,7 @@ def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
     zeta_lower = int_to_zeta(lower)
 
     return zeta_upper, zeta_lower
+
 # -----------------------------------------------------------------------------
 # Key initiation --------------------------------------------------------------
 # -----------------------------------------------------------------------------
