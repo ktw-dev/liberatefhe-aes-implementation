@@ -427,7 +427,6 @@ def _extract_bytes_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
 def key_initiation_fixed():
     byte_array = bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c")
     int_array = np.frombuffer(byte_array, dtype=np.uint8)
-    int_array = int_array.reshape(4,4).T
     int_array = int_array.flatten()
     int_array = np.repeat(int_array, 2048) # 각 원소가 2048번씩 반복되어 나타난다
     
@@ -492,10 +491,11 @@ if __name__ == "__main__":
     enc_key_hi_list.append(row_hi_2)
     enc_key_hi_list.append(row_hi_3)
     
-    enc_key_lo_list.append(row_lo_3)
     enc_key_lo_list.append(row_lo_0)
     enc_key_lo_list.append(row_lo_1)
     enc_key_lo_list.append(row_lo_2)
+    enc_key_lo_list.append(row_lo_3)
+
     
     print("Key scheduling start")
     start_time = time.time()
