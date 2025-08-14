@@ -58,13 +58,11 @@ row_lo_add = engine.add(row_lo_add, row_lo_3)
 hex_byte_add = _extract_bytes_hex(engine_context, row_hi_add, row_lo_add)
 print("row_add", hex_byte_add)
 
-row_hi_multiply = engine.multiply(row_hi_0, row_hi_0, engine_context.get_relinearization_key())
-row_hi_multiply = engine.multiply(row_hi_multiply, row_hi_1, engine_context.get_relinearization_key())
+row_hi_multiply = engine.multiply(row_hi_0, row_hi_1, engine_context.get_relinearization_key())
 row_hi_multiply = engine.multiply(row_hi_multiply, row_hi_2, engine_context.get_relinearization_key())
 row_hi_multiply = engine.multiply(row_hi_multiply, row_hi_3, engine_context.get_relinearization_key())
 
-row_lo_multiply = engine.multiply(row_lo_0, row_lo_0, engine_context.get_relinearization_key())
-row_lo_multiply = engine.multiply(row_lo_multiply, row_lo_1, engine_context.get_relinearization_key())
+row_lo_multiply = engine.multiply(row_lo_0, row_lo_1, engine_context.get_relinearization_key())
 row_lo_multiply = engine.multiply(row_lo_multiply, row_lo_2, engine_context.get_relinearization_key())
 row_lo_multiply = engine.multiply(row_lo_multiply, row_lo_3, engine_context.get_relinearization_key())
 
