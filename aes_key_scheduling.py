@@ -101,7 +101,7 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     t_minus_1_word_hi = engine.clone(enc_key_hi)
     t_minus_1_word_lo = engine.clone(enc_key_lo)
     
-    print(_extract_word_hex(engine_context, t_minus_1_word_hi, t_minus_1_word_lo))
+    print(_extract_bytes_hex(engine_context, t_minus_1_word_hi, t_minus_1_word_lo))
 
     # ------------------------------Rotating------------------------------
     rotated_word_hi = engine.rotate(t_minus_1_word_hi, engine_context.get_fixed_rotation_key(4 * 2048))
@@ -329,11 +329,11 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
             start_time = time.time()
             rot_word_hi, rot_word_lo = _rot_word(engine_context, word_hi[i-1], word_lo[i-1])
-            print(_extract_word_hex(engine_context, rot_word_hi, rot_word_lo))
+            print(_extract_bytes_hex(engine_context, rot_word_hi, rot_word_lo))
             sub_word_hi, sub_word_lo = _sub_word(engine_context, rot_word_hi, rot_word_lo)
-            print(_extract_word_hex(engine_context, sub_word_hi, sub_word_lo))
+            print(_extract_bytes_hex(engine_context, sub_word_hi, sub_word_lo))
             rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i)
-            print(_extract_word_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
+            print(_extract_bytes_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
@@ -369,12 +369,12 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
 # -----------------------------------------------------------------------------
 # Verification helpers ---------------------------------------------------------
 # -----------------------------------------------------------------------------
-def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
-    """Decrypt hi/lo nibble ciphertexts and reconstruct 16-byte array.
+def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
+    """Decrypt hi/lo nibble ciphertexts and return the first 4 bytes as hex.
 
     Assumes each byte occupies one 2048-slot block, repeated within the block.
-    Picks the element at index 2048 * i (i = 0..15) for each block, then
-    combines the hi/lo nibbles into full 8-bit bytes and returns as an array.
+    Takes indices 2048 * i for i = 0..3 (the leading 4 blocks) and formats as
+    an 8-hex-digit lowercase string (big-endian byte order).
     """
     engine = engine_context.get_engine()
     sk = engine_context.get_secret_key()
@@ -396,7 +396,34 @@ def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # Combine nibbles into bytes
     bytes_arr = ((hi_blocks << 4) | lo_blocks).astype(np.uint8)
 
-    return bytes_arr
+    # Take the first 4 bytes (row_0 window)
+    word_bytes = bytes_arr[0:4]
+    hex_str = "".join(f"{b:02x}" for b in word_bytes.tolist())
+
+    return hex_str
+
+
+def _extract_bytes_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
+    """Decrypt hi/lo ciphertexts and return 16 bytes as hex strings array.
+
+    Selects indices 2048 * i for i = 0..15 and combines hi/lo nibbles to bytes.
+    Returns a Python list of 16 two-digit lowercase hex strings.
+    """
+    engine = engine_context.get_engine()
+    sk = engine_context.get_secret_key()
+
+    dec_hi = engine.decrypt(ct_hi, sk)
+    dec_lo = engine.decrypt(ct_lo, sk)
+
+    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
+    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
+
+    indices = np.arange(0, 16 * 2048, 2048)
+    hi_blocks = nib_hi[indices].astype(np.uint16)
+    lo_blocks = nib_lo[indices].astype(np.uint16)
+    bytes_arr = ((hi_blocks << 4) | lo_blocks).astype(np.uint8)
+
+    return [f"{b:02x}" for b in bytes_arr.tolist()]
 
 
 # -----------------------------------------------------------------------------
