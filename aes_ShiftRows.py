@@ -194,6 +194,13 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     rotated_row_lo_3_012 = engine.rotate(masked_row_lo_3_012, fixed_rotation_key_list[3])
     rotated_row_lo_3_3 = engine.rotate(masked_row_lo_3_3, fixed_rotation_key_list[0])
     
+    print("rotated_row_1_0", _extract_bytes_hex(engine_context, rotated_row_hi_1_0, rotated_row_lo_1_0))
+    print("rotated_row_1_123", _extract_bytes_hex(engine_context, rotated_row_hi_1_123, rotated_row_lo_1_123))
+    print("rotated_row_2_01", _extract_bytes_hex(engine_context, rotated_row_hi_2_01, rotated_row_lo_2_01))
+    print("rotated_row_2_23", _extract_bytes_hex(engine_context, rotated_row_hi_2_23, rotated_row_lo_2_23))
+    print("rotated_row_3_012", _extract_bytes_hex(engine_context, rotated_row_hi_3_012, rotated_row_lo_3_012))
+    print("rotated_row_3_3", _extract_bytes_hex(engine_context, rotated_row_hi_3_3, rotated_row_lo_3_3))
+    
     # concatenate all the rotated rows
     rotated_rows_lo_0 = engine.add(masked_row_lo_0, rotated_row_lo_1_0)
     rotated_rows_lo_1 = engine.add(rotated_rows_lo_0, rotated_row_lo_1_123)
@@ -254,6 +261,9 @@ if __name__ == "__main__":
     print(f"ShiftRows time taken: {end_time - start_time} seconds")
     print(f"after shiftrows.level: hi={shifted_hi_ct.level}, lo={shifted_lo_ct.level}")
 
+    from aes_key_scheduling import _extract_bytes_hex
+    print("shifted_hi_ct", _extract_bytes_hex(engine_context, shifted_hi_ct, shifted_lo_ct))
+    
     # 3. 복호화 (hi/lo 둘 다)
     decoded_zeta_hi = engine.decrypt(shifted_hi_ct, secret_key)
     decoded_int_hi = zeta_to_int(decoded_zeta_hi)

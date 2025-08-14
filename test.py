@@ -19,6 +19,8 @@ key_zeta_hi, key_zeta_lo = key_initiation_fixed()
 key_zeta_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
 key_zeta_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
 
+print("key_zeta_hi", _extract_bytes_hex(engine_context, key_zeta_hi, key_zeta_lo))
+
 enc_key_hi_list = []
 enc_key_lo_list = []
 
