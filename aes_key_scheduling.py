@@ -472,6 +472,11 @@ if __name__ == "__main__":
     row_lo_2 = engine.multiply(key_zeta_lo, mask_row_2)
     row_lo_3 = engine.multiply(key_zeta_lo, mask_row_3)
     
+    print("row_0", _extract_bytes_hex(engine_context, row_hi_0, row_lo_0))
+    print("row_1", _extract_bytes_hex(engine_context, row_hi_1, row_lo_1))
+    print("row_2", _extract_bytes_hex(engine_context, row_hi_2, row_lo_2))
+    print("row_3", _extract_bytes_hex(engine_context, row_hi_3, row_lo_3))
+    
     row_hi_0 = engine.intt(row_hi_0)
     row_hi_1 = engine.intt(row_hi_1)
     row_hi_2 = engine.intt(row_hi_2)
