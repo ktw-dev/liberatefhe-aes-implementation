@@ -19,7 +19,8 @@ key_zeta_hi, key_zeta_lo = key_initiation_fixed()
 key_zeta_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
 key_zeta_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
 
-print("key_zeta_hi", _extract_bytes_hex(engine_context, key_zeta_hi, key_zeta_lo))
+hex_byte = _extract_bytes_hex(engine_context, key_zeta_hi, key_zeta_lo)
+print("key_zeta_hi", hex_byte)
 
 enc_key_hi_list = []
 enc_key_lo_list = []
@@ -45,3 +46,31 @@ print("row_hi_1", _extract_bytes_hex(engine_context, row_hi_1, row_lo_1))
 print("row_hi_2", _extract_bytes_hex(engine_context, row_hi_2, row_lo_2))
 print("row_hi_3", _extract_bytes_hex(engine_context, row_hi_3, row_lo_3))
 
+# compare add and multiply
+row_hi_add = engine.add(row_hi_0, row_hi_1)
+row_hi_add = engine.add(row_hi_add, row_hi_2)
+row_hi_add = engine.add(row_hi_add, row_hi_3)
+
+row_lo_add = engine.add(row_lo_0, row_lo_1)
+row_lo_add = engine.add(row_lo_add, row_lo_2)
+row_lo_add = engine.add(row_lo_add, row_lo_3)
+
+hex_byte_add = _extract_bytes_hex(engine_context, row_hi_add, row_lo_add)
+print("row_add", hex_byte_add)
+
+row_hi_multiply = engine.multiply(row_hi_0, row_hi_0)
+row_hi_multiply = engine.multiply(row_hi_multiply, row_hi_1)
+row_hi_multiply = engine.multiply(row_hi_multiply, row_hi_2)
+row_hi_multiply = engine.multiply(row_hi_multiply, row_hi_3)
+
+row_lo_multiply = engine.multiply(row_lo_0, row_lo_0)
+row_lo_multiply = engine.multiply(row_lo_multiply, row_lo_1)
+row_lo_multiply = engine.multiply(row_lo_multiply, row_lo_2)
+row_lo_multiply = engine.multiply(row_lo_multiply, row_lo_3)
+
+hex_byte_multiply = _extract_bytes_hex(engine_context, row_hi_multiply, row_lo_multiply)
+print("row_multiply", hex_byte_multiply)
+
+print("row_add == row_multiply", hex_byte_add == hex_byte_multiply)
+print("row_add == key_zeta", hex_byte_add == hex_byte)
+print("row_multiply == key_zeta", hex_byte_multiply == hex_byte)
