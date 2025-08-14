@@ -249,11 +249,12 @@ if __name__ == "__main__":
     alpha = int_to_zeta(alpha_int)
     beta  = int_to_zeta(beta_int)
     
-    print("alpha", _extract_bytes_hex(engine_context, alpha, beta))
-
     # 암호화
     enc_alpha = engine.encrypt(alpha, public_key, level=10)
     enc_beta  = engine.encrypt(beta, public_key, level=10)
+    
+    print("alpha", _extract_bytes_hex(engine_context, enc_alpha, enc_beta))
+
 
     # 2. ShiftRows 실행
     print("ShiftRows 실행")
