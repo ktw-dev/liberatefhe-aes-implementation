@@ -474,6 +474,16 @@ if __name__ == "__main__":
     row_lo_1 = engine.multiply(key_zeta_lo, mask_row_1)
     row_lo_2 = engine.multiply(key_zeta_lo, mask_row_2)
     row_lo_3 = engine.multiply(key_zeta_lo, mask_row_3)
+    
+    row_hi_0 = engine.intt(row_hi_0)
+    row_hi_1 = engine.intt(row_hi_1)
+    row_hi_2 = engine.intt(row_hi_2)
+    row_hi_3 = engine.intt(row_hi_3)
+    
+    row_lo_0 = engine.intt(row_lo_0)
+    row_lo_1 = engine.intt(row_lo_1)
+    row_lo_2 = engine.intt(row_lo_2)
+    row_lo_3 = engine.intt(row_lo_3)
 
     enc_key_hi_list.append(row_hi_0)
     enc_key_hi_list.append(row_hi_1)
