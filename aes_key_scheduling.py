@@ -111,6 +111,13 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     
     rotated_word_hi_123 = engine.multiply(rotated_word_hi, masking_container["row_0_123"])
     rotated_word_lo_123 = engine.multiply(rotated_word_lo, masking_container["row_0_123"])
+    
+    # ------------------------------Intt------------------------------
+    rotated_word_hi_0 = engine.intt(rotated_word_hi_0)
+    rotated_word_lo_0 = engine.intt(rotated_word_lo_0)
+    
+    rotated_word_hi_123 = engine.intt(rotated_word_hi_123)
+    rotated_word_lo_123 = engine.intt(rotated_word_lo_123)
 
     # ------------------------------Rotating------------------------------
     rotated_word_hi_0_to_3 = engine.rotate(rotated_word_hi_0, engine_context.get_fixed_rotation_key(3 * 2048))
@@ -163,6 +170,9 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # ------------------------------Concatenating------------------------------
     sub_bytes_hi = engine.multiply(sub_bytes_hi, masking_container["row_0"])
     sub_bytes_lo = engine.multiply(sub_bytes_lo, masking_container["row_0"])
+    
+    sub_bytes_hi = engine.intt(sub_bytes_hi)
+    sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     # ------------------------------Bootstrap------------------------------
     sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
