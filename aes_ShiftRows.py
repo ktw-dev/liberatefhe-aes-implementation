@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import numpy as np
 from engine_context import CKKS_EngineContext
+from aes_key_scheduling import _extract_bytes_hex
 
 __all__ = [
     "shift_rows",
@@ -247,6 +248,8 @@ if __name__ == "__main__":
     # zeta domain 매핑
     alpha = int_to_zeta(alpha_int)
     beta  = int_to_zeta(beta_int)
+    
+    print("alpha", _extract_bytes_hex(engine_context, alpha, beta))
 
     # 암호화
     enc_alpha = engine.encrypt(alpha, public_key, level=10)
@@ -261,7 +264,6 @@ if __name__ == "__main__":
     print(f"ShiftRows time taken: {end_time - start_time} seconds")
     print(f"after shiftrows.level: hi={shifted_hi_ct.level}, lo={shifted_lo_ct.level}")
 
-    from aes_key_scheduling import _extract_bytes_hex
     print("shifted_hi_ct", _extract_bytes_hex(engine_context, shifted_hi_ct, shifted_lo_ct))
     
     # 3. 복호화 (hi/lo 둘 다)
