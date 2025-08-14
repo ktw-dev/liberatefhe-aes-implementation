@@ -155,6 +155,14 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     masked_row_lo_3_012 = engine.multiply(ct_lo, row_3_012_mask_plaintext)
     masked_row_lo_3_3 = engine.multiply(ct_lo, row_3_3_mask_plaintext)
     
+    print("masked_row_hi_0", _extract_bytes_hex(engine_context, masked_row_hi_0, masked_row_lo_0))
+    print("masked_row_hi_1_0", _extract_bytes_hex(engine_context, masked_row_hi_1_0, masked_row_lo_1_0))
+    print("masked_row_hi_1_123", _extract_bytes_hex(engine_context, masked_row_hi_1_123, masked_row_lo_1_123))
+    print("masked_row_hi_2_01", _extract_bytes_hex(engine_context, masked_row_hi_2_01, masked_row_lo_2_01))
+    print("masked_row_hi_2_23", _extract_bytes_hex(engine_context, masked_row_hi_2_23, masked_row_lo_2_23))
+    print("masked_row_hi_3_012", _extract_bytes_hex(engine_context, masked_row_hi_3_012, masked_row_lo_3_012))
+    print("masked_row_hi_3_3", _extract_bytes_hex(engine_context, masked_row_hi_3_3, masked_row_lo_3_3))
+    
     # -----------------------------------------------------------------------------
     # rotate operation of High nibble
     # -----------------------------------------------------------------------------
