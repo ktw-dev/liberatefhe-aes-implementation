@@ -419,9 +419,9 @@ def _extract_bytes_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
 
     indices = np.arange(0, 16 * 2048, 2048)
-    hi_blocks = nib_hi[indices].astype(np.uint16)
-    lo_blocks = nib_lo[indices].astype(np.uint16)
-    bytes_arr = ((hi_blocks << 4) | lo_blocks).astype(np.uint8)
+    hi_blocks = nib_hi[indices]
+    lo_blocks = nib_lo[indices]
+    bytes_arr = ((hi_blocks << 4) & 0xF0) | (lo_blocks & 0x0F)
 
     return [f"{b:02x}" for b in bytes_arr.tolist()]
 
