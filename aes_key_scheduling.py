@@ -364,23 +364,12 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
 # -----------------------------------------------------------------------------
 # Verification helpers ---------------------------------------------------------
 # -----------------------------------------------------------------------------
-
-def _blocks_nonzero_indices(arr: np.ndarray, block_size: int = 2048) -> list[int]:
-    """Return indices of 2048-slot blocks that contain any non-zero entries."""
-    num_blocks = arr.shape[0] // block_size
-    idxs: list[int] = []
-    for b in range(num_blocks):
-        block = arr[b * block_size : (b + 1) * block_size]
-        if np.any(block != 0):
-            idxs.append(b)
-    return idxs
-
-
-def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
-    """Decrypt hi/lo nibble ciphertexts and reconstruct 4-byte word as hex.
+def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
+    """Decrypt hi/lo nibble ciphertexts and reconstruct 16-byte array.
 
     Assumes each byte occupies one 2048-slot block, repeated within the block.
-    Takes the first element from each non-zero block to form the byte sequence.
+    Picks the element at index 2048 * i (i = 0..15) for each block, then
+    combines the hi/lo nibbles into full 8-bit bytes and returns as an array.
     """
     engine = engine_context.get_engine()
     sk = engine_context.get_secret_key()
@@ -392,27 +381,18 @@ def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
     nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
     nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
 
-    # Find blocks carrying data. Expect 4 blocks for a word.
-    idxs_hi = set(_blocks_nonzero_indices(nib_hi))
-    idxs_lo = set(_blocks_nonzero_indices(nib_lo))
-    idxs = sorted(idxs_hi.union(idxs_lo))
-    if len(idxs) > 4:
-        # keep last 4 contiguous blocks if more detected
-        idxs = idxs[-4:]
-    # When empty because of bootstrap/intt placement, fall back to zeros
-    bytes_out: list[int] = []
-    for b in idxs:
-        base = b * 2048
-        high = int(nib_hi[base]) & 0xF
-        low = int(nib_lo[base]) & 0xF
-        bytes_out.append((high << 4) | low)
+    # Indices for the first element of each 2048-slot block
+    indices = np.arange(0, 16 * 2048, 2048)
 
-    # Pad to 4 bytes if needed
-    while len(bytes_out) < 4:
-        bytes_out.insert(0, 0)
+    # Extract one representative nibble per block
+    hi_blocks = nib_hi[indices].astype(np.uint16)
+    lo_blocks = nib_lo[indices].astype(np.uint16)
 
-    # Produce big-endian 4-byte hex
-    return ''.join(f"{b:02x}" for b in bytes_out[:4])
+    # Combine nibbles into bytes
+    bytes_arr = ((hi_blocks << 4) | lo_blocks).astype(np.uint8)
+
+    return bytes_arr
+
 
 # -----------------------------------------------------------------------------
 def key_initiation_fixed():
