@@ -220,8 +220,8 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     rcon_lo_encrypted = engine.encrypt(rcon_lo, engine_context.get_public_key(), current_level)
     
     # ------------------------------XOR------------------------------
-    rcon_xor_hi = engine.xor(enc_key_hi, rcon_hi_encrypted)
-    rcon_xor_lo = engine.xor(enc_key_lo, rcon_lo_encrypted)
+    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi_encrypted)
+    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo_encrypted)
     
     # ------------------------------Bootstrap------------------------------
     rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
