@@ -125,10 +125,13 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     rot_key_0_hi = engine.bootstrap(rot_key_0_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     rot_key_0_lo = engine.bootstrap(rot_key_0_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
+    rot_key_0_hi = engine.intt(rot_key_0_hi)
+    rot_key_0_lo = engine.intt(rot_key_0_lo)
+    
     return rot_key_0_hi, rot_key_0_lo
 
 # -----------------------------------------------------------------------------
-# _sub_word ------------------------------------------------------------------
+# _sub_word -------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
@@ -148,6 +151,9 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # ------------------------------Bootstrap------------------------------
     sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     sub_bytes_lo = engine.bootstrap(sub_bytes_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    sub_bytes_hi = engine.intt(sub_bytes_hi)
+    sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     return sub_bytes_hi, sub_bytes_lo
 
@@ -396,21 +402,32 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     return word_hi, word_lo
     
 # -----------------------------------------------------------------------------
+def key_initiation_fixed():
+    byte_array = bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c")
+    int_array = np.frombuffer(byte_array, dtype=np.uint8)
+    int_array = int_array.reshape(4,4).T
+    int_array = int_array.flatten()
+    int_array = np.repeat(int_array, 2048) # 각 원소가 2048번씩 반복되어 나타난다
     
+    int_array_hi = ((int_array >> 4) & 0x0F).astype(np.uint8)
+    int_array_lo = (int_array & 0x0F).astype(np.uint8)
+    
+    zeta_array_hi = int_to_zeta(int_array_hi)
+    zeta_array_lo = int_to_zeta(int_array_lo)
+        
+    return zeta_array_hi, zeta_array_lo
+
+
 if __name__ == "__main__":
-    from aes_main_process import engine_initiation, key_initiation_fixed
+    from aes_main_process import engine_initiation
     from aes_transform_zeta import zeta_to_int
     delta = [1 * 2048, 2 * 2048, 3 * 2048, 4 * 2048, 5 * 2048, 6 * 2048, 7 * 2048, 8 * 2048, 9 * 2048, 10 * 2048, 11 * 2048, 12 * 2048, 13 * 2048, 14 * 2048, 15 * 2048]
     engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta) 
-    print(engine_context.get_slot_count())
+    print("slot_count: ", engine_context.get_slot_count())
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
     
     key_zeta_hi, key_zeta_lo = key_initiation_fixed()
-    
-    # DEBUG
-    print(zeta_to_int(key_zeta_hi).astype(np.uint8)[:16])
-    print(zeta_to_int(key_zeta_lo).astype(np.uint8)[:16])
     
     key_zeta_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
     key_zeta_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
