@@ -560,6 +560,15 @@ if __name__ == "__main__":
     
     verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0xa4, 0x68, 0x6b, 0x02, 0x9c, 0x9f, 0x5b, 0x6a, 0x7f, 0x35, 0xea, 0x50, 0xf2, 0x2b, 0x43, 0x49], mode=mode_choice)
     
+    # noise reduction
+    print("noise reduction")
+    red_s_time = time.time()
+    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    red_e_time = time.time()
+    print(f"noise reduction complete!!! Time taken: {red_e_time - red_s_time} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0xa4, 0x68, 0x6b, 0x02, 0x9c, 0x9f, 0x5b, 0x6a, 0x7f, 0x35, 0xea, 0x50, 0xf2, 0x2b, 0x43, 0x49], mode=mode_choice)
+    
     # --- Round 2 --------------------------------------------------------------
     r2_time = time.time()
     enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
