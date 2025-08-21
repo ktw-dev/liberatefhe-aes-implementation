@@ -41,6 +41,7 @@ from aes_inv_MixColumns import inv_mix_columns as _inv_mix_columns
 from aes_SubBytes import sub_bytes as _sub_bytes
 from aes_ShiftRows import shift_rows as _shift_rows
 from aes_MixColumns import mix_columns as _mix_columns
+from aes_noise_reduction import noise_reduction as _noise_reduction
 
 # demo modules
 from aes_128_numpy import make_all_simd_round_key_vectors
@@ -348,6 +349,10 @@ def inv_mix_columns(engine_context, enc_data_hi, enc_data_lo):
 # Utility: stage completion ----------------------------------------------------
 # -----------------------------------------------------------------------------
 
+def noise_reduction(engine_context, enc_data_hi, enc_data_lo):
+    reduced_noise_hi = _noise_reduction(engine_context, enc_data_hi, 16)
+    reduced_noise_lo = _noise_reduction(engine_context, enc_data_lo, 16)
+    return reduced_noise_hi, reduced_noise_lo
 
 def wait_next_stage(stage: str, next_stage: str, delay: float = 1.0) -> None:
     """Print completion banner and sleep *delay* seconds."""
@@ -526,8 +531,6 @@ if __name__ == "__main__":
     start_time = time.time()
     sub_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = sub_bytes(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
     sub_e_time = time.time()
     print(f"sub_bytes complete!!! Time taken: {sub_e_time - sub_s_time} seconds")
     
@@ -535,8 +538,6 @@ if __name__ == "__main__":
     
     shift_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
     shift_e_time = time.time()
     print(f"shift_rows complete!!! Time taken: {shift_e_time - shift_s_time} seconds")
     
@@ -544,18 +545,22 @@ if __name__ == "__main__":
     
     mix_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
     mix_e_time = time.time()
     print(f"mix_columns complete!!! Time taken: {mix_e_time - mix_s_time} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth= [0x04, 0xe0, 0x48, 0x28, 0x66, 0xcb, 0xf8, 0x06, 0x81, 0x19, 0xd3, 0x26, 0xe4, 0x9a, 0x7a, 0x4c], mode=mode_choice)
+    
+    print("noise reduction")
+    red_s_time = time.time()
+    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    red_e_time = time.time()
+    print(f"noise reduction complete!!! Time taken: {red_e_time - red_s_time} seconds")
     
     verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth= [0x04, 0xe0, 0x48, 0x28, 0x66, 0xcb, 0xf8, 0x06, 0x81, 0x19, 0xd3, 0x26, 0xe4, 0x9a, 0x7a, 0x4c], mode=mode_choice)
     
     addkey_s_time = time.time()
     enc_data_hi_round_2 = AddRoundKey(engine_context, enc_data_hi_round_1, enc_key_hi_list[1])
     enc_data_lo_round_2 = AddRoundKey(engine_context, enc_data_lo_round_1, enc_key_lo_list[1])
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     addkey_e_time = time.time()
     print(f"addkey complete!!! Time taken: {addkey_e_time - addkey_s_time} seconds")    
     stop_time = time.time()
