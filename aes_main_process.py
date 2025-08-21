@@ -572,6 +572,7 @@ if __name__ == "__main__":
     # --- Round 2 --------------------------------------------------------------
     r2_time = time.time()
     enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x49, 0x45, 0x7f, 0x77, 0xde, 0xdb, 0x39, 0x02, 0xd2, 0x96, 0x87, 0x53, 0x89, 0xf1, 0x1a, 0x3b], mode=mode_choice)
     
     enc_data_hi_round_2, enc_data_lo_round_2 = shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     
