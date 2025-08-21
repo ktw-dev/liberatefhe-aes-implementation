@@ -577,6 +577,11 @@ if __name__ == "__main__":
     enc_data_hi_round_2, enc_data_lo_round_2 = shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x49, 0x45, 0x7f, 0x77, 0xdb, 0x39, 0x02, 0xde, 0x87, 0x53, 0xd2, 0x96, 0x3b, 0x89, 0xf1, 0x1a], mode=mode_choice)
     
+    # noise reduction
+    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x58, 0x1b, 0xdb, 0x1b, 0x4d, 0x4b, 0xe7, 0x6b, 0xca, 0x5a, 0xca, 0xb0, 0xf1, 0xac, 0xa8, 0xe5], mode=mode_choice)
+    
     enc_data_hi_round_2, enc_data_lo_round_2 = mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x58, 0x1b, 0xdb, 0x1b, 0x4d, 0x4b, 0xe7, 0x6b, 0xca, 0x5a, 0xca, 0xb0, 0xf1, 0xac, 0xa8, 0xe5], mode=mode_choice)
     
