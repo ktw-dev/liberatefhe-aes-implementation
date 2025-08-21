@@ -543,14 +543,6 @@ if __name__ == "__main__":
     
     verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0xd4, 0xe0, 0xb8, 0x1e, 0xbf, 0xb4, 0x41, 0x27, 0x5d, 0x52, 0x11, 0x98, 0x30, 0xae, 0xf1, 0xe5], mode=mode_choice)
     
-    print("noise reduction")
-    red_s_time = time.time()
-    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    red_e_time = time.time()
-    print(f"noise reduction complete!!! Time taken: {red_e_time - red_s_time} seconds")
-    
-    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0xd4, 0xe0, 0xb8, 0x1e, 0xbf, 0xb4, 0x41, 0x27, 0x5d, 0x52, 0x11, 0x98, 0x30, 0xae, 0xf1, 0xe5], mode=mode_choice)
-    
     mix_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     mix_e_time = time.time()
@@ -571,21 +563,13 @@ if __name__ == "__main__":
     # --- Round 2 --------------------------------------------------------------
     r2_time = time.time()
     enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     
     enc_data_hi_round_2, enc_data_lo_round_2 = shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     
     enc_data_hi_round_2, enc_data_lo_round_2 = mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
     
     enc_data_hi_round_3 = AddRoundKey(engine_context, enc_data_hi_round_2, enc_key_hi_list[2])
     enc_data_lo_round_3 = AddRoundKey(engine_context, enc_data_lo_round_2, enc_key_lo_list[2])
-    enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
-    enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
     r2_e_time = time.time()
     print(f"round 2 complete!!! Time taken: {(r2_e_time - r2_time)} seconds")
     
