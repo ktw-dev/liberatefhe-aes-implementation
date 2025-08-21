@@ -154,14 +154,6 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     masked_row_lo_3_012 = engine.multiply(ct_lo, row_3_012_mask_plaintext)
     masked_row_lo_3_3 = engine.multiply(ct_lo, row_3_3_mask_plaintext)
     
-    print("masked_row_hi_0", _extract_bytes_hex(engine_context, masked_row_hi_0, masked_row_lo_0))
-    print("masked_row_hi_1_0", _extract_bytes_hex(engine_context, masked_row_hi_1_0, masked_row_lo_1_0))
-    print("masked_row_hi_1_123", _extract_bytes_hex(engine_context, masked_row_hi_1_123, masked_row_lo_1_123))
-    print("masked_row_hi_2_01", _extract_bytes_hex(engine_context, masked_row_hi_2_01, masked_row_lo_2_01))
-    print("masked_row_hi_2_23", _extract_bytes_hex(engine_context, masked_row_hi_2_23, masked_row_lo_2_23))
-    print("masked_row_hi_3_012", _extract_bytes_hex(engine_context, masked_row_hi_3_012, masked_row_lo_3_012))
-    print("masked_row_hi_3_3", _extract_bytes_hex(engine_context, masked_row_hi_3_3, masked_row_lo_3_3))
-    
     # -----------------------------------------------------------------------------
     # rotate operation of High nibble
     # -----------------------------------------------------------------------------
@@ -201,13 +193,6 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
     rotated_row_lo_3_012 = engine.rotate(masked_row_lo_3_012, fixed_rotation_key_list[3])
     rotated_row_lo_3_3 = engine.rotate(masked_row_lo_3_3, fixed_rotation_key_list[0])
-    
-    print("rotated_row_1_0", _extract_bytes_hex(engine_context, rotated_row_hi_1_0, rotated_row_lo_1_0))
-    print("rotated_row_1_123", _extract_bytes_hex(engine_context, rotated_row_hi_1_123, rotated_row_lo_1_123))
-    print("rotated_row_2_01", _extract_bytes_hex(engine_context, rotated_row_hi_2_01, rotated_row_lo_2_01))
-    print("rotated_row_2_23", _extract_bytes_hex(engine_context, rotated_row_hi_2_23, rotated_row_lo_2_23))
-    print("rotated_row_3_012", _extract_bytes_hex(engine_context, rotated_row_hi_3_012, rotated_row_lo_3_012))
-    print("rotated_row_3_3", _extract_bytes_hex(engine_context, rotated_row_hi_3_3, rotated_row_lo_3_3))
     
     # concatenate all the rotated rows
     rotated_rows_lo_0 = engine.add(masked_row_lo_0, rotated_row_lo_1_0)
