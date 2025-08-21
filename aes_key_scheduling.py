@@ -326,19 +326,15 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
             start_time = time.time()
             rot_word_hi, rot_word_lo = _rot_word(engine_context, word_hi[i-1], word_lo[i-1])
-            print(_extract_bytes_hex(engine_context, rot_word_hi, rot_word_lo))
+            # print(_extract_bytes_hex(engine_context, rot_word_hi, rot_word_lo))
             sub_word_hi, sub_word_lo = _sub_word(engine_context, rot_word_hi, rot_word_lo)
-            print(_extract_bytes_hex(engine_context, sub_word_hi, sub_word_lo))
+            # print(_extract_bytes_hex(engine_context, sub_word_hi, sub_word_lo))
             rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i)
-            print(_extract_bytes_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
+            # print(_extract_bytes_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
-
-            # ---- Verification against ground truth ----------------------
-            gt_hex = WI_HEX_I4_TO_I43[i - 4]
-            got_hex = _extract_word_hex(engine_context, xor_hi, xor_lo)
-            print(f"W[{i}] match: {got_hex == gt_hex} (got={got_hex}, gt={gt_hex})")
+            
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
             
@@ -354,10 +350,6 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
 
-            # ---- Verification ------------------------------------------
-            gt_hex = WI_HEX_I4_TO_I43[i - 4]
-            got_hex = _extract_word_hex(engine_context, xor_hi, xor_lo)
-            print(f"W[{i}] match: {got_hex == gt_hex} (got={got_hex}, gt={gt_hex})")
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
     return word_hi, word_lo
@@ -503,7 +495,32 @@ if __name__ == "__main__":
     end_time = time.time()
     print(f"Key scheduling time: {end_time - start_time} seconds")
     
-    print()
+    # ---- concatenate all the round key blocks ----
+    round_blocks_hi = []
+    round_blocks_lo = []
+    for r in range(11):
+        base = 4 * r
+        # rotate words to their row positions (0, 1, 2, 3)
+        w0_hi = key_hi_list[base + 0]
+        w1_hi = engine.rotate(key_hi_list[base + 1])
+        w2_hi = engine.rotate(key_hi_list[base + 2])
+        w3_hi = engine.rotate(key_hi_list[base + 3])
+
+        w0_lo = key_lo_list[base + 0]
+        w1_lo = engine.rotate(key_lo_list[base + 1])
+        w2_lo = engine.rotate(key_lo_list[base + 2])
+        w3_lo = engine.rotate(key_lo_list[base + 3])
+
+        # add rows to form a single 16-byte block
+        block_hi = engine.add(engine.add(w0_hi, w1_hi), engine.add(w2_hi, w3_hi))
+        block_lo = engine.add(engine.add(w0_lo, w1_lo), engine.add(w2_lo, w3_lo))
+
+        round_blocks_hi.append(block_hi)
+        round_blocks_lo.append(block_lo)
+
+        # print combined block for verification
+        bytes_hex = _extract_bytes_hex(engine_context, block_hi, block_lo)
+        print(f"Round {r:02d} key:", bytes_hex)
     
     
     
