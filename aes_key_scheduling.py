@@ -33,6 +33,7 @@ import numpy as np
 from engine_context import CKKS_EngineContext
 from aes_SubBytes import sub_bytes
 from aes_xor import _xor_operation
+from aes_noise_reduction import noise_reduction
 
 # verification
 from aes_ground_truth import WI_HEX_I4_TO_I43
@@ -125,6 +126,10 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     rotated_word_hi = engine.add(rotated_word_hi_0_to_3, rotated_word_hi_123_to_012)
     rotated_word_lo = engine.add(rotated_word_lo_0_to_3, rotated_word_lo_123_to_012)
     
+    # ------------------------------Noise Reduction------------------------------
+    rotated_word_hi = noise_reduction(engine_context, rotated_word_hi)
+    rotated_word_lo = noise_reduction(engine_context, rotated_word_lo)
+    
     # ------------------------------Intt------------------------------
     rotated_word_hi = engine.intt(rotated_word_hi)
     rotated_word_lo = engine.intt(rotated_word_lo)
@@ -169,6 +174,10 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # ------------------------------Concatenating------------------------------
     sub_bytes_hi = engine.multiply(sub_bytes_hi, masking_container["row_0"])
     sub_bytes_lo = engine.multiply(sub_bytes_lo, masking_container["row_0"])
+    
+    # ------------------------------Noise Reduction------------------------------
+    sub_bytes_hi = noise_reduction(engine_context, sub_bytes_hi)
+    sub_bytes_lo = noise_reduction(engine_context, sub_bytes_lo)
     
     sub_bytes_hi = engine.intt(sub_bytes_hi)
     sub_bytes_lo = engine.intt(sub_bytes_lo)
@@ -228,6 +237,10 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi_encrypted)
     rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo_encrypted)
     
+    # ------------------------------Noise Reduction------------------------------
+    rcon_xor_hi = noise_reduction(engine_context, rcon_xor_hi)
+    rcon_xor_lo = noise_reduction(engine_context, rcon_xor_lo)
+    
     # ------------------------------Bootstrap------------------------------
     rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     rcon_xor_lo = engine.bootstrap(rcon_xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
@@ -248,6 +261,10 @@ def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi,
     # ------------------------------XOR------------------------------
     xor_hi = _xor_operation(engine_context, enc_key_hi, xor_key_hi)
     xor_lo = _xor_operation(engine_context, enc_key_lo, xor_key_lo)
+    
+    # ------------------------------Noise Reduction------------------------------
+    xor_hi = noise_reduction(engine_context, xor_hi)
+    xor_lo = noise_reduction(engine_context, xor_lo)
     
     # ------------------------------Bootstrap------------------------------
     xor_hi = engine.bootstrap(xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
@@ -433,10 +450,8 @@ def key_initiation_fixed():
         
     return zeta_array_hi, zeta_array_lo
 
-
 if __name__ == "__main__":
     from aes_main_process import engine_initiation
-    from aes_transform_zeta import zeta_to_int
     delta = [1 * 2048, 2 * 2048, 3 * 2048, 4 * 2048, 5 * 2048, 6 * 2048, 7 * 2048, 8 * 2048, 9 * 2048, 10 * 2048, 11 * 2048, 12 * 2048, 13 * 2048, 14 * 2048, 15 * 2048]
     engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta) 
     print("slot_count: ", engine_context.get_slot_count())

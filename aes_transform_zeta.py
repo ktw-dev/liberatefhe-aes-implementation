@@ -21,10 +21,6 @@ def int_to_zeta(arr: np.ndarray) -> np.ndarray:
     return result
     
 def zeta_to_int(zeta_arr: np.ndarray) -> np.ndarray:
-    """Inverse of `transform_to_zeta` assuming unit-magnitude complex numbers.
-
-    Values are mapped back to integers 0‥15 by measuring their phase.
-    """
     angles = np.angle(zeta_arr)  # range (-π, π]
     k      = (-angles * 16) / (2 * np.pi)
     k      = np.mod(np.rint(k), 16).astype(np.uint8)
