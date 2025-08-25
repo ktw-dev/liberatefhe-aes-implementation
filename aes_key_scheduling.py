@@ -215,6 +215,9 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     rcon_hi = np.repeat(aes_rcon_hi[rcon_index], 2048)
     rcon_lo = np.repeat(aes_rcon_lo[rcon_index], 2048)
     
+    rcon_hi = np.concatenate([rcon_hi, np.zeros(15 * 2048)])
+    rcon_lo = np.concatenate([rcon_lo, np.zeros(15 * 2048)])
+   
     rcon_hi = int_to_zeta(rcon_hi)
     rcon_lo = int_to_zeta(rcon_lo)
     
