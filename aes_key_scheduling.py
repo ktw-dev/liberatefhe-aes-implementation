@@ -130,10 +130,6 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     rotated_word_hi = noise_reduction(engine_context, rotated_word_hi)
     rotated_word_lo = noise_reduction(engine_context, rotated_word_lo)
     
-    # ------------------------------Intt------------------------------
-    rotated_word_hi = engine.intt(rotated_word_hi)
-    rotated_word_lo = engine.intt(rotated_word_lo)
-    
     # ------------------------------Bootstrap------------------------------
     rotated_word_hi = engine.bootstrap(rotated_word_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     rotated_word_lo = engine.bootstrap(rotated_word_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
@@ -178,9 +174,6 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     # ------------------------------Noise Reduction------------------------------
     sub_bytes_hi = noise_reduction(engine_context, sub_bytes_hi)
     sub_bytes_lo = noise_reduction(engine_context, sub_bytes_lo)
-    
-    sub_bytes_hi = engine.intt(sub_bytes_hi)
-    sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     # ------------------------------Bootstrap------------------------------
     sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())

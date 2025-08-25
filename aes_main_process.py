@@ -297,10 +297,7 @@ def _key_scheduling(engine_context, enc_key_hi, enc_key_lo):
 # -----------------------------------------------------------------------------
 
 def AddRoundKey(engine_context, enc_data, key):
-    engine = engine_context.get_engine()
-    
     enc_data = _xor_operation(engine_context, enc_data, key)
-    enc_data = engine.bootstrap(enc_data, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     return enc_data
 
 # -----------------------------------------------------------------------------
@@ -550,15 +547,6 @@ if __name__ == "__main__":
     
     verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth= [0x04, 0xe0, 0x48, 0x28, 0x66, 0xcb, 0xf8, 0x06, 0x81, 0x19, 0xd3, 0x26, 0xe5, 0x9a, 0x7a, 0x4c], mode=mode_choice)
     
-    # noise reduction
-    print("noise reduction")
-    red_s_time = time.time()
-    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    red_e_time = time.time()
-    print(f"noise reduction complete!!! Time taken: {red_e_time - red_s_time} seconds")
-    
-    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth= [0x04, 0xe0, 0x48, 0x28, 0x66, 0xcb, 0xf8, 0x06, 0x81, 0x19, 0xd3, 0x26, 0xe5, 0x9a, 0x7a, 0x4c], mode=mode_choice)
-    
     addkey_s_time = time.time()
     enc_data_hi_round_2 = AddRoundKey(engine_context, enc_data_hi_round_1, enc_key_hi_list[1])
     enc_data_lo_round_2 = AddRoundKey(engine_context, enc_data_lo_round_1, enc_key_lo_list[1])
@@ -577,15 +565,7 @@ if __name__ == "__main__":
     enc_data_hi_round_2, enc_data_lo_round_2 = shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x49, 0x45, 0x7f, 0x77, 0xdb, 0x39, 0x02, 0xde, 0x87, 0x53, 0xd2, 0x96, 0x3b, 0x89, 0xf1, 0x1a], mode=mode_choice)
     
-    # noise reduction
-    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x49, 0x45, 0x7f, 0x77, 0xdb, 0x39, 0x02, 0xde, 0x87, 0x53, 0xd2, 0x96, 0x3b, 0x89, 0xf1, 0x1a], mode=mode_choice)
-    
     enc_data_hi_round_2, enc_data_lo_round_2 = mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x58, 0x1b, 0xdb, 0x1b, 0x4d, 0x4b, 0xe7, 0x6b, 0xca, 0x5a, 0xca, 0xb0, 0xf1, 0xac, 0xa8, 0xe5], mode=mode_choice)
-    
-    # noise reduction
-    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x58, 0x1b, 0xdb, 0x1b, 0x4d, 0x4b, 0xe7, 0x6b, 0xca, 0x5a, 0xca, 0xb0, 0xf1, 0xac, 0xa8, 0xe5], mode=mode_choice)
     
     enc_data_hi_round_3 = AddRoundKey(engine_context, enc_data_hi_round_2, enc_key_hi_list[2])
