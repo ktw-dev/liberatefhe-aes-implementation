@@ -126,9 +126,13 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     rotated_word_hi = engine.add(rotated_word_hi_0_to_3, rotated_word_hi_123_to_012)
     rotated_word_lo = engine.add(rotated_word_lo_0_to_3, rotated_word_lo_123_to_012)
     
-    # ------------------------------Noise Reduction------------------------------
-    rotated_word_hi = noise_reduction(engine_context, rotated_word_hi)
-    rotated_word_lo = noise_reduction(engine_context, rotated_word_lo)
+    # # ------------------------------Noise Reduction------------------------------
+    # rotated_word_hi = noise_reduction(engine_context, rotated_word_hi)
+    # rotated_word_lo = noise_reduction(engine_context, rotated_word_lo)
+
+    # ------------------------------Intt------------------------------
+    rotated_word_hi = engine.intt(rotated_word_hi)
+    rotated_word_lo = engine.intt(rotated_word_lo)
     
     # ------------------------------Bootstrap------------------------------
     rotated_word_hi = engine.bootstrap(rotated_word_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
@@ -171,9 +175,13 @@ def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     sub_bytes_hi = engine.multiply(sub_bytes_hi, masking_container["row_0"])
     sub_bytes_lo = engine.multiply(sub_bytes_lo, masking_container["row_0"])
     
-    # ------------------------------Noise Reduction------------------------------
-    sub_bytes_hi = noise_reduction(engine_context, sub_bytes_hi)
-    sub_bytes_lo = noise_reduction(engine_context, sub_bytes_lo)
+    # # ------------------------------Noise Reduction------------------------------
+    # sub_bytes_hi = noise_reduction(engine_context, sub_bytes_hi)
+    # sub_bytes_lo = noise_reduction(engine_context, sub_bytes_lo)
+    
+    # ------------------------------Intt------------------------------
+    sub_bytes_hi = engine.intt(sub_bytes_hi)
+    sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     # ------------------------------Bootstrap------------------------------
     sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
@@ -230,9 +238,13 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi_encrypted)
     rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo_encrypted)
     
-    # ------------------------------Noise Reduction------------------------------
-    rcon_xor_hi = noise_reduction(engine_context, rcon_xor_hi)
-    rcon_xor_lo = noise_reduction(engine_context, rcon_xor_lo)
+    # # ------------------------------Noise Reduction------------------------------
+    # rcon_xor_hi = noise_reduction(engine_context, rcon_xor_hi)
+    # rcon_xor_lo = noise_reduction(engine_context, rcon_xor_lo)
+    
+    # ------------------------------Intt------------------------------
+    rcon_xor_hi = engine.intt(rcon_xor_hi)
+    rcon_xor_lo = engine.intt(rcon_xor_lo)
     
     # ------------------------------Bootstrap------------------------------
     rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
