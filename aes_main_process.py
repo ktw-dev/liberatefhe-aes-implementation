@@ -476,13 +476,13 @@ if __name__ == "__main__":
     # --- data/key HE-encryption stage ------------------------------------------------
     
     # 1. 데이터 암호화
-    enc_data_hi = engine.encrypt(data_zeta_hi, public_key)
-    enc_data_lo = engine.encrypt(data_zeta_lo, public_key)
+    enc_data_hi = engine.encrypt(data_zeta_hi, public_key, level=10)
+    enc_data_lo = engine.encrypt(data_zeta_lo, public_key, level=10)
     
     # 2. 키 암호화
     if mode_choice == "practice":
-        enc_key_hi = engine.encrypt(key_zeta_hi, public_key)
-        enc_key_lo = engine.encrypt(key_zeta_lo, public_key)
+        enc_key_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
+        enc_key_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
     
     # DEBUG
     # print(enc_data_hi)
