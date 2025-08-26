@@ -33,7 +33,7 @@ import numpy as np
 from engine_context import CKKS_EngineContext
 from aes_SubBytes import sub_bytes
 from aes_xor import _xor_operation
-from aes_noise_reduction import _noise_reduction
+from aes_noise_reduction import noise_reduction as _noise_reduction
 
 # verification
 from aes_ground_truth import WI_HEX_I4_TO_I43
