@@ -33,17 +33,18 @@ import numpy as np
 from engine_context import CKKS_EngineContext
 from aes_SubBytes import sub_bytes
 from aes_xor import _xor_operation
+from aes_noise_reduction import noise_reduction as _noise_reduction
 
 # verification
 from aes_ground_truth import WI_HEX_I4_TO_I43
 
 # -----------------------------------------------------------------------------
-# Dynamic import helpers (copied from aes-main-process) ------------------------
+# Table -----------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-AES_RCON = np.array([
-    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
-], dtype=np.uint8)
+# AES_RCON = np.array([
+#     0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
+# ], dtype=np.uint8)
 
 aes_rcon_hi = np.array([
     0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x4, 0x8, 0x1, 0x3
@@ -52,10 +53,14 @@ aes_rcon_lo = np.array([
     0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0, 0xb, 0x6
 ], dtype=np.uint8)
 
-# Round constants for AES key expansion (Rcon)
-AES_RCON = np.array([
-    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
-], dtype=np.uint8)
+masking_container = {
+    "row_0": np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)]),
+    "row_1": np.concatenate([np.zeros(4 * 2048), np.ones(4 * 2048), np.zeros(8 * 2048)]),
+    "row_2": np.concatenate([np.zeros(8 * 2048), np.ones(4 * 2048), np.zeros(4 * 2048)]),
+    "row_3": np.concatenate([np.zeros(12 * 2048), np.ones(4 * 2048)]),
+    "row_0_0": np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)]),
+    "row_0_123": np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
+}
 
 __all__ = [
     "rot_word",
@@ -70,9 +75,9 @@ __all__ = [
 # -----------------------------------------------------------------------------
 
 def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
-    """Apply RotWord operation to the first 4 word (bytes 0-3) of flat key array.
+    """Apply RotWord operation to the specific 4 word (bytes 0-3) of flat key array.
     
-    SIMD batching된 키를 입력으로 받아, 첫 행의 4 bytes를 왼쪽으로 1 byte circular shift하는 연산을 취한 후 반환한다.
+    SIMD batching된 키를 입력으로 받아, 특정 4 bytes를 왼쪽으로 1 byte circular shift하는 연산을 취한 후 반환한다.
     
     Parameters
     ----------
@@ -84,70 +89,99 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     -------
     rotated_hi_bytes : Ciphertext
     rotated_lo_bytes : Ciphertext
-
-    -------
-    example: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] -> [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 13]
+    
+    function:
+        1. 입력으로 받은 키 nibble에 대해 오른쪽으로 4 * 2048 만큼 회전시킨다. 이 과정을 통해 인덱스 12 * 2048 부터 16 * 2048 - 1 까지의 원소들이 인덱스 0 부터 4 * 2048 - 1 까지의 원소들로 이동한다.
+        2. 회전된 키 nibble에 대해 마스킹을 적용한다. 이 과정을 통해 0번;index 0 to 1 * 2048 - 1 과 123번;index 1 * 2048 to 4 * 2048 - 1 의 원소들을 분리할 수 있다.
+        3. 분리된 키 0번에 대해 오른쪽으로 3 * 2048 만큼 회전시키고 123번 키에 대해 왼쪽으로 1 * 2048 만큼 회전시킨다. 그 결과 circular left shift 연산이 작동한다.
+        4. 마지막으로 두 키를 재조합하여 반환한다. 이때 engine.multiply() 연산을 사용한다. 그 결과 rotation word가 완성된다
     """
     # load engine and keys
     engine = engine_context.get_engine()
     
-    t_minus_1_word_hi = engine.clone(enc_key_hi)
-    t_minus_1_word_lo = engine.clone(enc_key_lo)
+    t_minus_1_word_hi = enc_key_hi
+    t_minus_1_word_lo = enc_key_lo
     
-    print(_extract_word_hex(engine_context, t_minus_1_word_hi, t_minus_1_word_lo))
-    
+    print("t_minus_1_word", _extract_bytes_hex(engine_context, t_minus_1_word_hi, t_minus_1_word_lo))
+
     # ------------------------------Rotating------------------------------
     rotated_word_hi = engine.rotate(t_minus_1_word_hi, engine_context.get_fixed_rotation_key(4 * 2048))
     rotated_word_lo = engine.rotate(t_minus_1_word_lo, engine_context.get_fixed_rotation_key(4 * 2048))
     
     # ------------------------------Masking------------------------------
-    key_mask_0_0 = np.concatenate([np.ones(1 * 2048), np.zeros(15 * 2048)])
-    key_mask_0_123 = np.concatenate([np.zeros(1 * 2048), np.ones(3 * 2048), np.zeros(12 * 2048)])
+    rotated_word_hi_0 = engine.multiply(rotated_word_hi, masking_container["row_0_0"])
+    rotated_word_lo_0 = engine.multiply(rotated_word_lo, masking_container["row_0_0"])
     
-    key_mask_hi_0_0 = engine.multiply(rotated_word_hi, key_mask_0_0)
-    key_mask_hi_0_123 = engine.multiply(rotated_word_hi, key_mask_0_123)
-    
-    key_mask_lo_0_0 = engine.multiply(rotated_word_lo, key_mask_0_0)
-    key_mask_lo_0_123 = engine.multiply(rotated_word_lo, key_mask_0_123)
-    
+    rotated_word_hi_123 = engine.multiply(rotated_word_hi, masking_container["row_0_123"])
+    rotated_word_lo_123 = engine.multiply(rotated_word_lo, masking_container["row_0_123"])
+
     # ------------------------------Rotating------------------------------
-    rot_key_0_3_hi = engine.rotate(key_mask_hi_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
-    rot_key_0_3_lo = engine.rotate(key_mask_lo_0_0, engine_context.get_fixed_rotation_key(3 * 2048))
+    rotated_word_hi_0_to_3 = engine.rotate(rotated_word_hi_0, engine_context.get_fixed_rotation_key(3 * 2048))
+    rotated_word_lo_0_to_3 = engine.rotate(rotated_word_lo_0, engine_context.get_fixed_rotation_key(3 * 2048))
     
-    rot_key_123_012_hi = engine.rotate(key_mask_hi_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
-    rot_key_123_012_lo = engine.rotate(key_mask_lo_0_123, engine_context.get_fixed_rotation_key(-1 * 2048))
+    rotated_word_hi_123_to_012 = engine.rotate(rotated_word_hi_123, engine_context.get_fixed_rotation_key(-1 * 2048))
+    rotated_word_lo_123_to_012 = engine.rotate(rotated_word_lo_123, engine_context.get_fixed_rotation_key(-1 * 2048))
     
     # ------------------------------Concatenating------------------------------
-    rot_key_0_hi = engine.multiply(rot_key_0_3_hi, rot_key_123_012_hi, engine_context.get_relinearization_key())
-    rot_key_0_lo = engine.multiply(rot_key_0_3_lo, rot_key_123_012_lo, engine_context.get_relinearization_key())
+    rotated_word_hi = engine.add(rotated_word_hi_0_to_3, rotated_word_hi_123_to_012)
+    rotated_word_lo = engine.add(rotated_word_lo_0_to_3, rotated_word_lo_123_to_012)
+    
+    # ------------------------------Intt------------------------------
+    rotated_word_hi = engine.intt(rotated_word_hi)
+    rotated_word_lo = engine.intt(rotated_word_lo)
     
     # ------------------------------Bootstrap------------------------------
-    rot_key_0_hi = engine.bootstrap(rot_key_0_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    rot_key_0_lo = engine.bootstrap(rot_key_0_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rotated_word_hi = engine.bootstrap(rotated_word_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rotated_word_lo = engine.bootstrap(rotated_word_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
-    return rot_key_0_hi, rot_key_0_lo
+    # ------------------------------Intt------------------------------
+    rotated_word_hi = engine.intt(rotated_word_hi)
+    rotated_word_lo = engine.intt(rotated_word_lo)
+    
+    return rotated_word_hi, rotated_word_lo
 
 # -----------------------------------------------------------------------------
-# _sub_word ------------------------------------------------------------------
+# _sub_word -------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 def _sub_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
+    """Apply SubWord operation to the specific 4 word (bytes 0-3) of flat key array.
+    
+    Parameters
+    ----------
+    engine_context : CKKS_EngineContext
+    enc_key_hi : Ciphertext
+    enc_key_lo : Ciphertext
+    
+    Returns
+    -------
+    sub_word_hi : Ciphertext
+    sub_word_lo : Ciphertext
+    
+    function:
+        1. 입력으로 받은 키 nibble에 대해 sub bytes 연산을 취한다.
+        2. 마스킹을 적용하여 0123번 키만 남기고 나머지는 0으로 만든다.
+    """ 
     engine = engine_context.get_engine()
     
-    masks = np.concatenate([np.ones(4 * 2048), np.zeros(12 * 2048)])
-    
+    # ------------------------------Sub Bytes------------------------------
     sub_bytes_hi, sub_bytes_lo = sub_bytes(engine_context, enc_key_hi, enc_key_lo)
     
-    # ------------------------------Masking------------------------------
-    sub_bytes_hi = engine.multiply(sub_bytes_hi, masks)
-    sub_bytes_lo = engine.multiply(sub_bytes_lo, masks)
+    # ------------------------------Concatenating------------------------------
+    sub_bytes_hi = engine.multiply(sub_bytes_hi, masking_container["row_0"])
+    sub_bytes_lo = engine.multiply(sub_bytes_lo, masking_container["row_0"])
     
+    # ------------------------------Intt------------------------------
     sub_bytes_hi = engine.intt(sub_bytes_hi)
     sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     # ------------------------------Bootstrap------------------------------
     sub_bytes_hi = engine.bootstrap(sub_bytes_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     sub_bytes_lo = engine.bootstrap(sub_bytes_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
+    # ------------------------------Intt------------------------------
+    sub_bytes_hi = engine.intt(sub_bytes_hi)
+    sub_bytes_lo = engine.intt(sub_bytes_lo)
     
     return sub_bytes_hi, sub_bytes_lo
 
@@ -170,44 +204,41 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
     -------
     result_hi : Ciphertext
     result_lo : Ciphertext
+    
+    function:
+        1. 입력으로 받은 키 nibble에 대해 rcon xor 연산을 취한다.
     """
     engine = engine_context.get_engine()
+    current_level = enc_key_hi.level
     
-    rcon_hi = AES_RCON[round_num]
-    rcon_lo = AES_RCON[round_num]
+    rcon_index = (round_num // 4) - 1
     
+    # ------------------------------Rcon Indexing------------------------------
+    rcon_hi = np.repeat(aes_rcon_hi[rcon_index], 2048)
+    rcon_lo = np.repeat(aes_rcon_lo[rcon_index], 2048)
+    
+    rcon_hi = np.concatenate([rcon_hi, np.zeros(15 * 2048)])
+    rcon_lo = np.concatenate([rcon_lo, np.zeros(15 * 2048)])
+   
     rcon_hi = int_to_zeta(rcon_hi)
     rcon_lo = int_to_zeta(rcon_lo)
-
-    # Build plaintext vectors where first 1*2048 slots are filled with rcon_hi
-    # and the remaining 15*2048 slots are zeros. Keep dtype float64 for encode.
-    slot_cnt = engine_context.get_slot_count()
-    assert slot_cnt % 2048 == 0, "slot count should be a multiple of 2048"
-
-    rcon_hi_vec = np.zeros(slot_cnt, dtype=np.complex128)
-    rcon_hi_vec[: 1 * 2048] = (rcon_hi)
-    rcon_hi_pt = engine.encrypt(rcon_hi_vec, engine_context.get_public_key(), level=10)
-
-    # If needed later for low nibble as well
-    rcon_lo_vec = np.zeros(slot_cnt, dtype=np.complex128)
-    rcon_lo_vec[: 1 * 2048] = (rcon_lo)
-    rcon_lo_pt = engine.encrypt(rcon_lo_vec, engine_context.get_public_key(), level=10)
     
+    rcon_hi_encrypted = engine.encrypt(rcon_hi, engine_context.get_public_key(), current_level)
+    rcon_lo_encrypted = engine.encrypt(rcon_lo, engine_context.get_public_key(), current_level)
     
-    # Ensure operands are in standard (non-NTT) form before XOR polynomial
-    enc_key_hi_std = engine.intt(enc_key_hi)
-    enc_key_lo_std = engine.intt(enc_key_lo)
-    rcon_hi_std = engine.intt(rcon_hi_pt)
-    rcon_lo_std = engine.intt(rcon_lo_pt)
+    # ------------------------------XOR------------------------------
+    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi, rcon_hi_encrypted)
+    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo, rcon_lo_encrypted)
 
-    # XOR ciphertext with Rcon ciphertexts (broadcast in first 2048 slots)
-    rcon_xor_hi = _xor_operation(engine_context, enc_key_hi_std, rcon_hi_std)
-    rcon_xor_lo = _xor_operation(engine_context, enc_key_lo_std, rcon_lo_std)
-
-    # Keep in standard domain; caller will bootstrap if/when needed    
+    # ------------------------------Intt------------------------------
+    rcon_xor_hi = engine.intt(rcon_xor_hi)
+    rcon_xor_lo = engine.intt(rcon_xor_lo)
+    
+    # ------------------------------Bootstrap------------------------------
     rcon_xor_hi = engine.bootstrap(rcon_xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     rcon_xor_lo = engine.bootstrap(rcon_xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
+    # ------------------------------Intt------------------------------
     rcon_xor_hi = engine.intt(rcon_xor_hi)
     rcon_xor_lo = engine.intt(rcon_xor_lo)
     
@@ -220,74 +251,31 @@ def _rcon_xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, round_
 def _xor(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo, xor_key_hi, xor_key_lo):
     engine = engine_context.get_engine()
     
-    enc_key_hi_std = engine.intt(enc_key_hi)
-    enc_key_lo_std = engine.intt(enc_key_lo)
-    xor_key_hi_std = engine.intt(xor_key_hi)
-    xor_key_lo_std = engine.intt(xor_key_lo)
+    # ------------------------------XOR------------------------------
+    xor_hi = _xor_operation(engine_context, enc_key_hi, xor_key_hi)
+    xor_lo = _xor_operation(engine_context, enc_key_lo, xor_key_lo)
+
+    # ------------------------------Intt------------------------------
+    xor_hi = engine.intt(xor_hi)
+    xor_lo = engine.intt(xor_lo)
     
-    xor_hi, xor_lo = _xor_operation(engine_context, enc_key_hi_std, xor_key_hi_std), _xor_operation(engine_context, enc_key_lo_std, xor_key_lo_std)
-    
+    # ------------------------------Bootstrap------------------------------
     xor_hi = engine.bootstrap(xor_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     xor_lo = engine.bootstrap(xor_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
+    # ------------------------------Intt------------------------------
     xor_hi = engine.intt(xor_hi)
     xor_lo = engine.intt(xor_lo)
     
     return xor_hi, xor_lo
 
-
 # -----------------------------------------------------------------------------
-# Verification helpers ---------------------------------------------------------
+# noise_reduction -------------------------------------------------------------
 # -----------------------------------------------------------------------------
-
-def _blocks_nonzero_indices(arr: np.ndarray, block_size: int = 2048) -> list[int]:
-    """Return indices of 2048-slot blocks that contain any non-zero entries."""
-    num_blocks = arr.shape[0] // block_size
-    idxs: list[int] = []
-    for b in range(num_blocks):
-        block = arr[b * block_size : (b + 1) * block_size]
-        if np.any(block != 0):
-            idxs.append(b)
-    return idxs
-
-
-def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
-    """Decrypt hi/lo nibble ciphertexts and reconstruct 4-byte word as hex.
-
-    Assumes each byte occupies one 2048-slot block, repeated within the block.
-    Takes the first element from each non-zero block to form the byte sequence.
-    """
-    engine = engine_context.get_engine()
-    sk = engine_context.get_secret_key()
-
-    dec_hi = engine.decrypt(ct_hi, sk)
-    dec_lo = engine.decrypt(ct_lo, sk)
-
-    # Map zeta to integers 0..15, and zero-out tiny numerical noise
-    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
-    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
-
-    # Find blocks carrying data. Expect 4 blocks for a word.
-    idxs_hi = set(_blocks_nonzero_indices(nib_hi))
-    idxs_lo = set(_blocks_nonzero_indices(nib_lo))
-    idxs = sorted(idxs_hi.union(idxs_lo))
-    if len(idxs) > 4:
-        # keep last 4 contiguous blocks if more detected
-        idxs = idxs[-4:]
-    # When empty because of bootstrap/intt placement, fall back to zeros
-    bytes_out: list[int] = []
-    for b in idxs:
-        base = b * 2048
-        high = int(nib_hi[base]) & 0xF
-        low = int(nib_lo[base]) & 0xF
-        bytes_out.append((high << 4) | low)
-
-    # Pad to 4 bytes if needed
-    while len(bytes_out) < 4:
-        bytes_out.insert(0, 0)
-
-    # Produce big-endian 4-byte hex
-    return ''.join(f"{b:02x}" for b in bytes_out[:4])
+def noise_reduction(engine_context, enc_data_hi, enc_data_lo):
+    reduced_noise_hi = _noise_reduction(engine_context, enc_data_hi, 16)
+    reduced_noise_lo = _noise_reduction(engine_context, enc_data_lo, 16)
+    return reduced_noise_hi, reduced_noise_lo
 
 # -----------------------------------------------------------------------------
 # key_scheduling --------------------------------------------------------------
@@ -359,19 +347,19 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 - 1의 워드를 rot_word 연산 후 sub_word 연산 후 rcon_xor 연산 후 4의 배수 - 4 번째 워드와 xor 연산
             start_time = time.time()
             rot_word_hi, rot_word_lo = _rot_word(engine_context, word_hi[i-1], word_lo[i-1])
-            print(_extract_word_hex(engine_context, rot_word_hi, rot_word_lo))
+            rot_word_hi, rot_word_lo = noise_reduction(engine_context, rot_word_hi, rot_word_lo)
+            # print(_extract_bytes_hex(engine_context, rot_word_hi, rot_word_lo))
             sub_word_hi, sub_word_lo = _sub_word(engine_context, rot_word_hi, rot_word_lo)
-            print(_extract_word_hex(engine_context, sub_word_hi, sub_word_lo))
-            rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i//4)
-            print(_extract_word_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
+            sub_word_hi, sub_word_lo = noise_reduction(engine_context, sub_word_hi, sub_word_lo)
+            # print(_extract_bytes_hex(engine_context, sub_word_hi, sub_word_lo))
+            rcon_xor_hi, rcon_xor_lo = _rcon_xor(engine_context, sub_word_hi, sub_word_lo, i)
+            rcon_xor_hi, rcon_xor_lo = noise_reduction(engine_context, rcon_xor_hi, rcon_xor_lo)
+            # print(_extract_bytes_hex(engine_context, rcon_xor_hi, rcon_xor_lo))
             xor_hi, xor_lo = _xor(engine_context, rcon_xor_hi, rcon_xor_lo, word_hi[i-4], word_lo[i-4])
+            xor_hi, xor_lo = noise_reduction(engine_context, xor_hi, xor_lo)
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
-
-            # ---- Verification against ground truth ----------------------
-            gt_hex = WI_HEX_I4_TO_I43[i - 4]
-            got_hex = _extract_word_hex(engine_context, xor_hi, xor_lo)
-            print(f"W[{i}] match: {got_hex == gt_hex} (got={got_hex}, gt={gt_hex})")
+            
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
             
@@ -380,37 +368,104 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 x - 4의 배수 -1 번째 워드와 4의 배수 - 3 번째 워드를 xor 연산
             word_hi_i_minus_1 = engine.rotate(word_hi[i-1], engine_context.get_fixed_rotation_key(4 * 2048))
             word_lo_i_minus_1 = engine.rotate(word_lo[i-1], engine_context.get_fixed_rotation_key(4 * 2048))
+            word_hi_i_minus_1, word_lo_i_minus_1 = noise_reduction(engine_context, word_hi_i_minus_1, word_lo_i_minus_1)
             word_hi_i_minus_3 = word_hi[i-4]
             word_lo_i_minus_3 = word_lo[i-4]
             
             xor_hi, xor_lo = _xor(engine_context, word_hi_i_minus_1, word_lo_i_minus_1, word_hi_i_minus_3, word_lo_i_minus_3)
+            xor_hi, xor_lo = noise_reduction(engine_context, xor_hi, xor_lo)
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
 
-            # ---- Verification ------------------------------------------
-            gt_hex = WI_HEX_I4_TO_I43[i - 4]
-            got_hex = _extract_word_hex(engine_context, xor_hi, xor_lo)
-            print(f"W[{i}] match: {got_hex == gt_hex} (got={got_hex}, gt={gt_hex})")
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
     return word_hi, word_lo
-    
+
+
 # -----------------------------------------------------------------------------
+# Verification helpers ---------------------------------------------------------
+# -----------------------------------------------------------------------------
+def _extract_word_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo) -> str:
+    """Decrypt hi/lo nibble ciphertexts and return the first 4 bytes as hex.
+
+    Assumes each byte occupies one 2048-slot block, repeated within the block.
+    Takes indices 2048 * i for i = 0..3 (the leading 4 blocks) and formats as
+    an 8-hex-digit lowercase string (big-endian byte order).
+    """
+    engine = engine_context.get_engine()
+    sk = engine_context.get_secret_key()
+
+    dec_hi = engine.decrypt(ct_hi, sk)
+    dec_lo = engine.decrypt(ct_lo, sk)
+
+    # Map zeta to integers 0..15, and zero-out tiny numerical noise
+    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
+    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
+
+    # Indices for the first element of each 2048-slot block
+    indices = np.arange(0, 16 * 2048, 2048)
+
+    # Extract one representative nibble per block
+    hi_blocks = nib_hi[indices].astype(np.uint16)
+    lo_blocks = nib_lo[indices].astype(np.uint16)
+
+    # Combine nibbles into bytes
+    bytes_arr = ((hi_blocks << 4) | lo_blocks).astype(np.uint8)
+
+    # Take the first 4 bytes (row_0 window)
+    word_bytes = bytes_arr[0:4]
+    hex_str = "".join(f"{b:02x}" for b in word_bytes.tolist())
+
+    return hex_str
+
+
+def _extract_bytes_hex(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
+    """Decrypt hi/lo ciphertexts and return 16 bytes as hex strings array.
+
+    Selects indices 2048 * i for i = 0..15 and combines hi/lo nibbles to bytes.
+    Returns a Python list of 16 two-digit lowercase hex strings.
+    """
+    engine = engine_context.get_engine()
+    sk = engine_context.get_secret_key()
+
+    dec_hi = engine.decrypt(ct_hi, sk)
+    dec_lo = engine.decrypt(ct_lo, sk)
+
+    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
+    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
+
+    indices = np.arange(0, 16 * 2048, 2048)
+    hi_blocks = nib_hi[indices]
+    lo_blocks = nib_lo[indices]
+    bytes_arr = ((hi_blocks << 4) & 0xF0) | (lo_blocks & 0x0F)
+
+    return [f"{b:02x}" for b in bytes_arr.tolist()]
+
+
+# -----------------------------------------------------------------------------
+def key_initiation_fixed():
+    byte_array = bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c")
+    int_array = np.frombuffer(byte_array, dtype=np.uint8)
+    int_array = int_array.flatten()
+    int_array = np.repeat(int_array, 2048) # 각 원소가 2048번씩 반복되어 나타난다
     
+    int_array_hi = ((int_array >> 4) & 0x0F).astype(np.uint8)
+    int_array_lo = (int_array & 0x0F).astype(np.uint8)
+    
+    zeta_array_hi = int_to_zeta(int_array_hi)
+    zeta_array_lo = int_to_zeta(int_array_lo)
+        
+    return zeta_array_hi, zeta_array_lo
+
 if __name__ == "__main__":
-    from aes_main_process import engine_initiation, key_initiation_fixed
-    from aes_transform_zeta import zeta_to_int
+    from aes_main_process import engine_initiation
     delta = [1 * 2048, 2 * 2048, 3 * 2048, 4 * 2048, 5 * 2048, 6 * 2048, 7 * 2048, 8 * 2048, 9 * 2048, 10 * 2048, 11 * 2048, 12 * 2048, 13 * 2048, 14 * 2048, 15 * 2048]
     engine_context = engine_initiation(signature=1, mode='parallel', use_bootstrap=True, thread_count = 16, device_id = 0, fixed_rotation=True, delta_list=delta) 
-    print(engine_context.get_slot_count())
+    print("slot_count: ", engine_context.get_slot_count())
     engine = engine_context.get_engine()
     public_key = engine_context.get_public_key()
     
     key_zeta_hi, key_zeta_lo = key_initiation_fixed()
-    
-    # DEBUG
-    print(zeta_to_int(key_zeta_hi).astype(np.uint8)[:16])
-    print(zeta_to_int(key_zeta_lo).astype(np.uint8)[:16])
     
     key_zeta_hi = engine.encrypt(key_zeta_hi, public_key, level=10)
     key_zeta_lo = engine.encrypt(key_zeta_lo, public_key, level=10)
@@ -432,16 +487,32 @@ if __name__ == "__main__":
     row_lo_1 = engine.multiply(key_zeta_lo, mask_row_1)
     row_lo_2 = engine.multiply(key_zeta_lo, mask_row_2)
     row_lo_3 = engine.multiply(key_zeta_lo, mask_row_3)
+    
+    print("row_0", _extract_bytes_hex(engine_context, row_hi_0, row_lo_0))
+    print("row_1", _extract_bytes_hex(engine_context, row_hi_1, row_lo_1))
+    print("row_2", _extract_bytes_hex(engine_context, row_hi_2, row_lo_2))
+    print("row_3", _extract_bytes_hex(engine_context, row_hi_3, row_lo_3))
+    
+    row_hi_0 = engine.intt(row_hi_0)
+    row_hi_1 = engine.intt(row_hi_1)
+    row_hi_2 = engine.intt(row_hi_2)
+    row_hi_3 = engine.intt(row_hi_3)
+    
+    row_lo_0 = engine.intt(row_lo_0)
+    row_lo_1 = engine.intt(row_lo_1)
+    row_lo_2 = engine.intt(row_lo_2)
+    row_lo_3 = engine.intt(row_lo_3)
 
     enc_key_hi_list.append(row_hi_0)
     enc_key_hi_list.append(row_hi_1)
     enc_key_hi_list.append(row_hi_2)
     enc_key_hi_list.append(row_hi_3)
     
-    enc_key_lo_list.append(row_lo_3)
     enc_key_lo_list.append(row_lo_0)
     enc_key_lo_list.append(row_lo_1)
     enc_key_lo_list.append(row_lo_2)
+    enc_key_lo_list.append(row_lo_3)
+
     
     print("Key scheduling start")
     start_time = time.time()
@@ -449,7 +520,32 @@ if __name__ == "__main__":
     end_time = time.time()
     print(f"Key scheduling time: {end_time - start_time} seconds")
     
-    print()
+    # ---- concatenate all the round key blocks ----
+    round_blocks_hi = []
+    round_blocks_lo = []
+    for r in range(11):
+        base = 4 * r
+        # rotate words to their row positions (0, 1, 2, 3)
+        w0_hi = key_hi_list[base + 0]
+        w1_hi = key_hi_list[base + 1]
+        w2_hi = key_hi_list[base + 2]
+        w3_hi = key_hi_list[base + 3]
+
+        w0_lo = key_lo_list[base + 0]
+        w1_lo = key_lo_list[base + 1]
+        w2_lo = key_lo_list[base + 2]
+        w3_lo = key_lo_list[base + 3]
+
+        # add rows to form a single 16-byte block
+        block_hi = engine.add(engine.add(w0_hi, w1_hi), engine.add(w2_hi, w3_hi))
+        block_lo = engine.add(engine.add(w0_lo, w1_lo), engine.add(w2_lo, w3_lo))
+
+        round_blocks_hi.append(block_hi)
+        round_blocks_lo.append(block_lo)
+
+        # print combined block for verification
+        bytes_hex = _extract_bytes_hex(engine_context, block_hi, block_lo)
+        print(f"Round {r:02d} key:", bytes_hex)
     
     
     

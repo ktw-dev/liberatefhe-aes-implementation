@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import numpy as np
 from engine_context import CKKS_EngineContext
+from aes_key_scheduling import _extract_bytes_hex
 
 __all__ = [
     "shift_rows",
@@ -111,8 +112,7 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     fixed_rotation_key_list = [engine_context.get_fixed_rotation_key(i * 2048) for i in range(-3, 4) if i != 0]
     # -3 -2 -1 1 2 3
-    print(fixed_rotation_key_list)
-    
+        
     # -----------------------------------------------------------------------------
     # Load / cache plaintext masks -------------------------------------------------
     # -----------------------------------------------------------------------------
@@ -240,10 +240,13 @@ if __name__ == "__main__":
     # zeta domain 매핑
     alpha = int_to_zeta(alpha_int)
     beta  = int_to_zeta(beta_int)
-
+    
     # 암호화
     enc_alpha = engine.encrypt(alpha, public_key, level=10)
     enc_beta  = engine.encrypt(beta, public_key, level=10)
+    
+    print("alpha", _extract_bytes_hex(engine_context, enc_alpha, enc_beta))
+
 
     # 2. ShiftRows 실행
     print("ShiftRows 실행")
@@ -254,6 +257,8 @@ if __name__ == "__main__":
     print(f"ShiftRows time taken: {end_time - start_time} seconds")
     print(f"after shiftrows.level: hi={shifted_hi_ct.level}, lo={shifted_lo_ct.level}")
 
+    print("shifted_hi_ct", _extract_bytes_hex(engine_context, shifted_hi_ct, shifted_lo_ct))
+    
     # 3. 복호화 (hi/lo 둘 다)
     decoded_zeta_hi = engine.decrypt(shifted_hi_ct, secret_key)
     decoded_int_hi = zeta_to_int(decoded_zeta_hi)

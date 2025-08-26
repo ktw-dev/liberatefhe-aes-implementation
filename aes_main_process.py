@@ -41,6 +41,7 @@ from aes_inv_MixColumns import inv_mix_columns as _inv_mix_columns
 from aes_SubBytes import sub_bytes as _sub_bytes
 from aes_ShiftRows import shift_rows as _shift_rows
 from aes_MixColumns import mix_columns as _mix_columns
+from aes_noise_reduction import noise_reduction as _noise_reduction
 
 # demo modules
 from aes_128_numpy import make_all_simd_round_key_vectors
@@ -152,11 +153,21 @@ def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
     """
     # 1. Generate random data-blocks
     blocks = np.array([0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34], dtype=np.uint8)
-    
+
     print("blocks: ", blocks)
 
     # 2. Flatten to 1-D array following batching layout
-    flat = blocks_to_flat_array(blocks)
+    blocks_4x4 = blocks.reshape(4, 4)
+    flat_col_major = blocks_4x4.T.flatten()
+    
+    # Repeat each byte 2048 times
+    flat = np.repeat(flat_col_major, 2048)
+    
+    print("flat: ", flat)
+    print("Sample indices (i * 2048):")
+    for i in range(16):
+        print(f"{flat[i * 2048]}\t")
+    print()
 
     # 3. Split each byte into upper / lower 4-bit nibbles
     upper, lower = split_to_nibbles(flat)
@@ -166,6 +177,7 @@ def data_initiation_demo() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
     zeta_lower = int_to_zeta(lower)
 
     return zeta_upper, zeta_lower
+
 # -----------------------------------------------------------------------------
 # Key initiation --------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -285,10 +297,7 @@ def _key_scheduling(engine_context, enc_key_hi, enc_key_lo):
 # -----------------------------------------------------------------------------
 
 def AddRoundKey(engine_context, enc_data, key):
-    engine = engine_context.get_engine()
-    
     enc_data = _xor_operation(engine_context, enc_data, key)
-    enc_data = engine.bootstrap(enc_data, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     return enc_data
 
 # -----------------------------------------------------------------------------
@@ -337,6 +346,10 @@ def inv_mix_columns(engine_context, enc_data_hi, enc_data_lo):
 # Utility: stage completion ----------------------------------------------------
 # -----------------------------------------------------------------------------
 
+def noise_reduction(engine_context, enc_data_hi, enc_data_lo):
+    reduced_noise_hi = _noise_reduction(engine_context, enc_data_hi, 16)
+    reduced_noise_lo = _noise_reduction(engine_context, enc_data_lo, 16)
+    return reduced_noise_hi, reduced_noise_lo
 
 def wait_next_stage(stage: str, next_stage: str, delay: float = 1.0) -> None:
     """Print completion banner and sleep *delay* seconds."""
@@ -351,6 +364,69 @@ def wait_next_stage(stage: str, next_stage: str, delay: float = 1.0) -> None:
     print("--------------------------------")
     time.sleep(delay)
     print("\n")
+
+
+def verify_round_output(
+    engine_context: CKKS_EngineContext,
+    ct_hi,
+    ct_lo,
+    ground_truth: np.ndarray | list[int],
+    *,
+    label: str = "",
+    mode: str = "demo"
+) -> bool:
+    """Decrypt *ct_hi/ct_lo*, reconstruct bytes, and compare with *ground_truth*.
+
+    Parameters
+    ----------
+    engine_context : CKKS_EngineContext
+        Context holding engine & secret key.
+    ct_hi, ct_lo : Ciphertext
+        CKKS ciphertexts holding ζ^(upper nibble) / ζ^(lower nibble) values.
+    ground_truth : array-like, length 16
+        Expected 16-byte block (row-major order).
+    label : str, optional
+        Name of the stage for logging.
+
+    Returns
+    -------
+    bool
+        True if all 16 bytes match ground truth, else False.
+    """
+    if mode == "practice":
+        return None
+    
+    engine = engine_context.get_engine()
+    sk = engine_context.get_secret_key()
+
+    gt = np.asarray(ground_truth, dtype=np.uint8).reshape(16)
+    
+    print("gt: ", gt)
+
+    # Decrypt & convert back to ints 0..15 per nibble
+    dec_hi = engine.decrypt(ct_hi, sk)
+    dec_lo = engine.decrypt(ct_lo, sk)
+    nib_hi = zeta_to_int(dec_hi).astype(np.uint8)
+    nib_lo = zeta_to_int(dec_lo).astype(np.uint8)
+
+    # Combine hi/lo nibbles and sample every 2048-slot block (first 16 bytes only)
+    slot_stride = 2048
+    combined_bytes = ((nib_hi[0::slot_stride] << 4) | nib_lo[0::slot_stride]).astype(np.uint8)
+    
+    print("combined_bytes length: ", len(combined_bytes))
+
+    print("combined_bytes: ", combined_bytes)
+
+    passed = np.array_equal(combined_bytes, gt)
+
+    report_label = f"[{label}] " if label else ""
+    if passed:
+        print(f"✓ {report_label}verification passed")
+    else:
+        print(f"⚠️  {report_label}mismatch – needs review")
+        print("  expected:", [f"{b:02x}" for b in gt])
+        print("  got     :", [f"{b:02x}" for b in combined_bytes[:16]])
+    return passed
 
 
 # -----------------------------------------------------------------------------
@@ -443,224 +519,308 @@ if __name__ == "__main__":
     start_time = time.time()
     enc_data_hi_round_1 = AddRoundKey(engine_context, enc_data_hi, enc_key_hi_list[0])
     enc_data_lo_round_1 = AddRoundKey(engine_context, enc_data_lo, enc_key_lo_list[0])
+    # noise reduction
+    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
+    
     end_time = time.time()
-    print(f"addkey complete!!! Time taken: {(end_time - start_time)} seconds")
+    print(f"round 0 complete!!! Time taken: {(end_time - start_time)} seconds")
+
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0x19, 0xa0, 0x9a, 0xe9, 0x3d, 0xf4, 0xc6, 0xf8, 0xe3, 0xe2, 0x8d, 0x48, 0xbe, 0x2b, 0x2a, 0x08], mode=mode_choice)
         
     # --- Round 1 --------------------------------------------------------------
     start_time = time.time()
     sub_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = sub_bytes(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    # noise reduction
+    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     sub_e_time = time.time()
     print(f"sub_bytes complete!!! Time taken: {sub_e_time - sub_s_time} seconds")
     
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0xd4, 0xe0, 0xb8, 0x1e, 0x27, 0xbf, 0xb4, 0x41, 0x11, 0x98, 0x5d, 0x52, 0xae, 0xf1, 0xe5, 0x30], mode=mode_choice)
+    
     shift_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = shift_rows(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    # noise reduction
+    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     shift_e_time = time.time()
     print(f"shift_rows complete!!! Time taken: {shift_e_time - shift_s_time} seconds")
     
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth = [0xd4, 0xe0, 0xb8, 0x1e, 0xbf, 0xb4, 0x41, 0x27, 0x5d, 0x52, 0x11, 0x98, 0x30, 0xae, 0xf1, 0xe5], mode=mode_choice)
+    
     mix_s_time = time.time()
     enc_data_hi_round_1, enc_data_lo_round_1 = mix_columns(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    # noise reduction
+    enc_data_hi_round_1, enc_data_lo_round_1 = noise_reduction(engine_context, enc_data_hi_round_1, enc_data_lo_round_1)
     mix_e_time = time.time()
     print(f"mix_columns complete!!! Time taken: {mix_e_time - mix_s_time} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_1, enc_data_lo_round_1, ground_truth= [0x04, 0xe0, 0x48, 0x28, 0x66, 0xcb, 0xf8, 0x06, 0x81, 0x19, 0xd3, 0x26, 0xe5, 0x9a, 0x7a, 0x4c], mode=mode_choice)
     
     addkey_s_time = time.time()
     enc_data_hi_round_2 = AddRoundKey(engine_context, enc_data_hi_round_1, enc_key_hi_list[1])
     enc_data_lo_round_2 = AddRoundKey(engine_context, enc_data_lo_round_1, enc_key_lo_list[1])
-    enc_data_hi_round_1 = engine.intt(enc_data_hi_round_1)
-    enc_data_lo_round_1 = engine.intt(enc_data_lo_round_1)
+    # noise reduction
+    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
     addkey_e_time = time.time()
-    print(f"addkey complete!!! Time taken: {addkey_e_time - addkey_s_time} seconds")
-    
+    print(f"addkey complete!!! Time taken: {addkey_e_time - addkey_s_time} seconds")    
     stop_time = time.time()
     print(f"round 1 complete!!! Time taken: {(stop_time - start_time)} seconds")
     
+    verify = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0xa4, 0x68, 0x6b, 0x02, 0x9c, 0x9f, 0x5b, 0x6a, 0x7f, 0x35, 0xea, 0x50, 0xf2, 0x2b, 0x43, 0x49], mode=mode_choice)
+    
     # --- Round 2 --------------------------------------------------------------
+    r2_time = time.time()
     enc_data_hi_round_2, enc_data_lo_round_2 = sub_bytes(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
+    # noise reduction
+    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x49, 0x45, 0x7f, 0x77, 0xde, 0xdb, 0x39, 0x02, 0xd2, 0x96, 0x87, 0x53, 0x89, 0xf1, 0x1a, 0x3b], mode=mode_choice)
     
     enc_data_hi_round_2, enc_data_lo_round_2 = shift_rows(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
+    # noise reduction
+    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x49, 0x45, 0x7f, 0x77, 0xdb, 0x39, 0x02, 0xde, 0x87, 0x53, 0xd2, 0x96, 0x3b, 0x89, 0xf1, 0x1a], mode=mode_choice)
     
     enc_data_hi_round_2, enc_data_lo_round_2 = mix_columns(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
-    enc_data_hi_round_2 = engine.intt(enc_data_hi_round_2)
-    enc_data_lo_round_2 = engine.intt(enc_data_lo_round_2)
+    # noise reduction
+    enc_data_hi_round_2, enc_data_lo_round_2 = noise_reduction(engine_context, enc_data_hi_round_2, enc_data_lo_round_2)
+    result = verify_round_output(engine_context, enc_data_hi_round_2, enc_data_lo_round_2, ground_truth= [0x58, 0x1b, 0xdb, 0x1b, 0x4d, 0x4b, 0xe7, 0x6b, 0xca, 0x5a, 0xca, 0xb0, 0xf1, 0xac, 0xa8, 0xe5], mode=mode_choice)
     
     enc_data_hi_round_3 = AddRoundKey(engine_context, enc_data_hi_round_2, enc_key_hi_list[2])
     enc_data_lo_round_3 = AddRoundKey(engine_context, enc_data_lo_round_2, enc_key_lo_list[2])
-    enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
-    enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
+    # noise reduction
+    enc_data_hi_round_3, enc_data_lo_round_3 = noise_reduction(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    r2_e_time = time.time()
+    print(f"round 2 complete!!! Time taken: {(r2_e_time - r2_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_3, enc_data_lo_round_3, ground_truth= [0xaa, 0x61, 0x82, 0x68, 0x8f, 0xdd, 0xd2, 0x32, 0x5f, 0xe3, 0x4a, 0x46, 0x03, 0xef, 0xd2, 0x9a], mode=mode_choice)
     
     # --- Round 3 --------------------------------------------------------------
+    r3_time = time.time()
     enc_data_hi_round_3, enc_data_lo_round_3 = sub_bytes(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    # noise reduction
+    enc_data_hi_round_3, enc_data_lo_round_3 = noise_reduction(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
     enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
     enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
     
     enc_data_hi_round_3, enc_data_lo_round_3 = shift_rows(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    # noise reduction
+    enc_data_hi_round_3, enc_data_lo_round_3 = noise_reduction(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
     enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
     enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
     
     enc_data_hi_round_3, enc_data_lo_round_3 = mix_columns(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
+    # noise reduction
+    enc_data_hi_round_3, enc_data_lo_round_3 = noise_reduction(engine_context, enc_data_hi_round_3, enc_data_lo_round_3)
     enc_data_hi_round_3 = engine.intt(enc_data_hi_round_3)
     enc_data_lo_round_3 = engine.intt(enc_data_lo_round_3)
     
     enc_data_hi_round_4 = AddRoundKey(engine_context, enc_data_hi_round_3, enc_key_hi_list[3])
     enc_data_lo_round_4 = AddRoundKey(engine_context, enc_data_lo_round_3, enc_key_lo_list[3])
+    # noise reduction
+    enc_data_hi_round_4, enc_data_lo_round_4 = noise_reduction(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
     enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
     enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    r3_e_time = time.time()
+    print(f"round 3 complete!!! Time taken: {(r3_e_time - r3_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_4, enc_data_lo_round_4, ground_truth= [0x48, 0x67, 0x4d, 0xd6, 0x6c, 0x1d, 0xe3, 0x5f, 0x4e, 0x9d, 0xb1, 0x58, 0xee, 0x0d, 0x38, 0xe7], mode=mode_choice)
     
     # --- Round 4 --------------------------------------------------------------
+    r4_time = time.time()
     enc_data_hi_round_4, enc_data_lo_round_4 = sub_bytes(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
-    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
-    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    # noise reduction
+    enc_data_hi_round_4, enc_data_lo_round_4 = noise_reduction(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
     
     enc_data_hi_round_4, enc_data_lo_round_4 = shift_rows(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
-    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
-    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    # noise reduction
+    enc_data_hi_round_4, enc_data_lo_round_4 = noise_reduction(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
     
     enc_data_hi_round_4, enc_data_lo_round_4 = mix_columns(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
-    enc_data_hi_round_4 = engine.intt(enc_data_hi_round_4)
-    enc_data_lo_round_4 = engine.intt(enc_data_lo_round_4)
+    # noise reduction
+    enc_data_hi_round_4, enc_data_lo_round_4 = noise_reduction(engine_context, enc_data_hi_round_4, enc_data_lo_round_4)
     
     enc_data_hi_round_5 = AddRoundKey(engine_context, enc_data_hi_round_4, enc_key_hi_list[4])
     enc_data_lo_round_5 = AddRoundKey(engine_context, enc_data_lo_round_4, enc_key_lo_list[4])
-    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
-    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    # noise reduction
+    enc_data_hi_round_5, enc_data_lo_round_5 = noise_reduction(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
+    r4_e_time = time.time()
+    print(f"round 4 complete!!! Time taken: {(r4_e_time - r4_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_5, enc_data_lo_round_5, ground_truth= [0xe0, 0xc8, 0xd9, 0x85, 0x92, 0x63, 0xb1, 0xb8, 0x7f, 0x63, 0x35, 0xbe, 0xe8, 0xc0, 0x50, 0x01], mode=mode_choice)
     
     # --- Round 5 --------------------------------------------------------------
+    r5_time = time.time()
     enc_data_hi_round_5, enc_data_lo_round_5 = sub_bytes(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
-    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
-    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    # noise reduction
+    enc_data_hi_round_5, enc_data_lo_round_5 = noise_reduction(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
     
     enc_data_hi_round_5, enc_data_lo_round_5 = shift_rows(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
-    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
-    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    # noise reduction
+    enc_data_hi_round_5, enc_data_lo_round_5 = noise_reduction(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
     
     enc_data_hi_round_5, enc_data_lo_round_5 = mix_columns(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
-    enc_data_hi_round_5 = engine.intt(enc_data_hi_round_5)
-    enc_data_lo_round_5 = engine.intt(enc_data_lo_round_5)
+    # noise reduction
+    enc_data_hi_round_5, enc_data_lo_round_5 = noise_reduction(engine_context, enc_data_hi_round_5, enc_data_lo_round_5)
     
     enc_data_hi_round_6 = AddRoundKey(engine_context, enc_data_hi_round_5, enc_key_hi_list[5])
     enc_data_lo_round_6 = AddRoundKey(engine_context, enc_data_lo_round_5, enc_key_lo_list[5])
-    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
-    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    # noise reduction
+    enc_data_hi_round_6, enc_data_lo_round_6 = noise_reduction(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
+    r5_e_time = time.time()
+    print(f"round 5 complete!!! Time taken: {(r5_e_time - r5_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_5, enc_data_lo_round_5, ground_truth= [0xf1, 0xc1, 0x7c, 0x5d, 0x00, 0x92, 0xc8, 0xb5, 0x6f, 0x4c, 0x8b, 0xd5, 0x55, 0xef, 0x32, 0x0c], mode=mode_choice)
     
     # --- Round 6 --------------------------------------------------------------
+    r6_time = time.time()
     enc_data_hi_round_6, enc_data_lo_round_6 = sub_bytes(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
-    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
-    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    # noise reduction
+    enc_data_hi_round_6, enc_data_lo_round_6 = noise_reduction(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
     
     enc_data_hi_round_6, enc_data_lo_round_6 = shift_rows(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
-    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
-    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    # noise reduction
+    enc_data_hi_round_6, enc_data_lo_round_6 = noise_reduction(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
     
     enc_data_hi_round_6, enc_data_lo_round_6 = mix_columns(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
-    enc_data_hi_round_6 = engine.intt(enc_data_hi_round_6)
-    enc_data_lo_round_6 = engine.intt(enc_data_lo_round_6)
+    # noise reduction
+    enc_data_hi_round_6, enc_data_lo_round_6 = noise_reduction(engine_context, enc_data_hi_round_6, enc_data_lo_round_6)
     
     enc_data_hi_round_7 = AddRoundKey(engine_context, enc_data_hi_round_6, enc_key_hi_list[6])
     enc_data_lo_round_7 = AddRoundKey(engine_context, enc_data_lo_round_6, enc_key_lo_list[6])
-    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
-    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    # noise reduction
+    enc_data_hi_round_7, enc_data_lo_round_7 = noise_reduction(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
+    r6_e_time = time.time()
+    print(f"round 6 complete!!! Time taken: {(r6_e_time - r6_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_7, enc_data_lo_round_7, ground_truth= [0x26, 0x3d, 0xe8, 0xfd, 0x0e, 0x41, 0x64, 0xd2, 0x2e, 0xb7, 0x72, 0x8b, 0x17, 0x7d, 0xa9, 0x25], mode=mode_choice)
     
     # --- Round 7 --------------------------------------------------------------
+    r7_time = time.time()
     enc_data_hi_round_7, enc_data_lo_round_7 = sub_bytes(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
-    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
-    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    # noise reduction
+    enc_data_hi_round_7, enc_data_lo_round_7 = noise_reduction(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
     
     enc_data_hi_round_7, enc_data_lo_round_7 = shift_rows(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
-    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
-    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    # noise reduction
+    enc_data_hi_round_7, enc_data_lo_round_7 = noise_reduction(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
     
     enc_data_hi_round_7, enc_data_lo_round_7 = mix_columns(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
-    enc_data_hi_round_7 = engine.intt(enc_data_hi_round_7)
-    enc_data_lo_round_7 = engine.intt(enc_data_lo_round_7)
+    # noise reduction
+    enc_data_hi_round_7, enc_data_lo_round_7 = noise_reduction(engine_context, enc_data_hi_round_7, enc_data_lo_round_7)
     
     enc_data_hi_round_8 = AddRoundKey(engine_context, enc_data_hi_round_7, enc_key_hi_list[7])
     enc_data_lo_round_8 = AddRoundKey(engine_context, enc_data_lo_round_7, enc_key_lo_list[7])
-    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
-    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    # noise reduction
+    enc_data_hi_round_8, enc_data_lo_round_8 = noise_reduction(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
+    r7_e_time = time.time()
+    print(f"round 7 complete!!! Time taken: {(r7_e_time - r7_time)} seconds")
     
+    verify = verify_round_output(engine_context, enc_data_hi_round_8, enc_data_lo_round_8, ground_truth= [0x5a, 0x19, 0xa3, 0x7a, 0x41, 0x49, 0xe0, 0x8c, 0x42, 0xdc, 0x19, 0x04, 0xb1, 0x1f, 0x65, 0x0c], mode=mode_choice)
+
     # --- Round 8 --------------------------------------------------------------
+    r8_time = time.time()
     enc_data_hi_round_8, enc_data_lo_round_8 = sub_bytes(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
-    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
-    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    # noise reduction
+    enc_data_hi_round_8, enc_data_lo_round_8 = noise_reduction(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
     
     enc_data_hi_round_8, enc_data_lo_round_8 = shift_rows(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
-    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
-    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    # noise reduction
+    enc_data_hi_round_8, enc_data_lo_round_8 = noise_reduction(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
     
     enc_data_hi_round_8, enc_data_lo_round_8 = mix_columns(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
-    enc_data_hi_round_8 = engine.intt(enc_data_hi_round_8)
-    enc_data_lo_round_8 = engine.intt(enc_data_lo_round_8)
+    # noise reduction
+    enc_data_hi_round_8, enc_data_lo_round_8 = noise_reduction(engine_context, enc_data_hi_round_8, enc_data_lo_round_8)
     
     enc_data_hi_round_9 = AddRoundKey(engine_context, enc_data_hi_round_8, enc_key_hi_list[8])
     enc_data_lo_round_9 = AddRoundKey(engine_context, enc_data_lo_round_8, enc_key_lo_list[8])
-    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
-    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    # noise reduction
+    enc_data_hi_round_9, enc_data_lo_round_9 = noise_reduction(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
+    r8_e_time = time.time()
+    print(f"round 8 complete!!! Time taken: {(r8_e_time - r8_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_9, enc_data_lo_round_9, ground_truth= [0xea, 0x04, 0x65, 0x85, 0x83, 0x45, 0x5d, 0x96, 0x5c, 0x33, 0x98, 0xb0, 0xf0, 0x2d, 0xad, 0xc5], mode=mode_choice)
     
     # --- Round 9 --------------------------------------------------------------
+    r9_time = time.time()
     enc_data_hi_round_9, enc_data_lo_round_9 = sub_bytes(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
-    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
-    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    # noise reduction
+    enc_data_hi_round_9, enc_data_lo_round_9 = noise_reduction(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
     
     enc_data_hi_round_9, enc_data_lo_round_9 = shift_rows(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
-    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
-    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    # noise reduction
+    enc_data_hi_round_9, enc_data_lo_round_9 = noise_reduction(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
     
     enc_data_hi_round_9, enc_data_lo_round_9 = mix_columns(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
-    enc_data_hi_round_9 = engine.intt(enc_data_hi_round_9)
-    enc_data_lo_round_9 = engine.intt(enc_data_lo_round_9)
+    # noise reduction
+    enc_data_hi_round_9, enc_data_lo_round_9 = noise_reduction(engine_context, enc_data_hi_round_9, enc_data_lo_round_9)
     
     enc_data_hi_round_10 = AddRoundKey(engine_context, enc_data_hi_round_9, enc_key_hi_list[9])
     enc_data_lo_round_10 = AddRoundKey(engine_context, enc_data_lo_round_9, enc_key_lo_list[9])
-    enc_data_hi_round_10 = engine.intt(enc_data_hi_round_10)
-    enc_data_lo_round_10 = engine.intt(enc_data_lo_round_10)
+    # noise reduction
+    enc_data_hi_round_10, enc_data_lo_round_10 = noise_reduction(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
+    r9_e_time = time.time()
+    print(f"round 9 complete!!! Time taken: {(r9_e_time - r9_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi_round_10, enc_data_lo_round_10, ground_truth= [0xeb, 0x59, 0x8b, 0x1b, 0x40, 0x2e, 0xa1, 0xc3, 0xf2, 0x38, 0x13, 0x42, 0x1e, 0x84, 0xe7, 0xd2], mode=mode_choice)
     
     # --- Round 10 --------------------------------------------------------------
+    r10_time = time.time()
     enc_data_hi_round_10, enc_data_lo_round_10 = sub_bytes(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
-    enc_data_hi_round_10 = engine.intt(enc_data_hi_round_10)
-    enc_data_lo_round_10 = engine.intt(enc_data_lo_round_10)
+    # noise reduction
+    enc_data_hi_round_10, enc_data_lo_round_10 = noise_reduction(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
     
     enc_data_hi_round_10, enc_data_lo_round_10 = shift_rows(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
-    enc_data_hi_round_10 = engine.intt(enc_data_hi_round_10)
-    enc_data_lo_round_10 = engine.intt(enc_data_lo_round_10)
+    # noise reduction
+    enc_data_hi_round_10, enc_data_lo_round_10 = noise_reduction(engine_context, enc_data_hi_round_10, enc_data_lo_round_10)
     
     enc_data_hi = AddRoundKey(engine_context, enc_data_hi_round_10, enc_key_hi_list[10])
     enc_data_lo = AddRoundKey(engine_context, enc_data_lo_round_10, enc_key_lo_list[10])
-    enc_data_hi = engine.intt(enc_data_hi)
-    enc_data_lo = engine.intt(enc_data_lo)
+    # noise reduction
+    enc_data_hi, enc_data_lo = noise_reduction(engine_context, enc_data_hi, enc_data_lo)
+    r10_e_time = time.time()
+    print(f"round 10 complete!!! Time taken: {(r10_e_time - r10_time)} seconds")
+    
+    verify = verify_round_output(engine_context, enc_data_hi, enc_data_lo, ground_truth= [0x39, 0x02, 0xdc, 0x19, 0x25, 0xdc, 0x11, 0x6a, 0x84, 0x09, 0x85, 0x0b, 0x1d, 0xfb, 0x97, 0x32], mode=mode_choice)
     
     wait_next_stage("encryption stage", "decryption stage")
 
     # --- Decryption stage ----------------------------------------------------
     
     # 암호화된 데이터 사용
-    enc_data_hi = enc_data_hi
-    enc_data_lo = enc_data_lo
+    # enc_data_hi = enc_data_hi
+    # enc_data_lo = enc_data_lo
     
     # 기존의 키 리스트 사용(역순)
-    key_hi_list = [key_hi_list[::-1]]
-    key_lo_list = [key_lo_list[::-1]]
-        
+    key_hi_list = [enc_key_hi_list[::-1]]
+    key_lo_list = [enc_key_lo_list[::-1]]
+      
     # --- Round 0 --------------------------------------------------------------
-    dec_data_hi_round_0 = AddRoundKey(enc_data_hi, key_hi_list[0])
-    dec_data_lo_round_0 = AddRoundKey(enc_data_lo, key_lo_list[0])
+    r0_time = time.time()
+    dec_data_hi_round_0 = AddRoundKey(engine_context, enc_data_hi, key_hi_list[0])
+    dec_data_lo_round_0 = AddRoundKey(engine_context, enc_data_lo, key_lo_list[0])
+    # noise reduction
+    dec_data_hi_round_0, dec_data_lo_round_0 = noise_reduction(engine_context, dec_data_hi_round_0, dec_data_lo_round_0)
         
     dec_data_hi_round_0, dec_data_lo_round_0 = inv_shift_rows(engine_context, dec_data_hi_round_0, dec_data_lo_round_0)
+    # noise reduction
+    dec_data_hi_round_0, dec_data_lo_round_0 = noise_reduction(engine_context, dec_data_hi_round_0, dec_data_lo_round_0)
     
     dec_data_hi_round_1, dec_data_lo_round_1 = inv_sub_bytes(engine_context, dec_data_hi_round_0, dec_data_lo_round_0)
+    # noise reduction
+    dec_data_hi_round_1, dec_data_lo_round_1 = noise_reduction(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
+    
+    r0_e_time = time.time()
+    print(f"round 0 complete!!! Time taken: {(r0_e_time - r0_time)} seconds")
+    
+    verify = verify_round_output(engine_context, dec_data_hi_round_0, dec_data_lo_round_0, ground_truth= [0xeb, 0x59, 0x8b, 0x1b, 0x40, 0x2e, 0xa1, 0xc3, 0xf2, 0x38, 0x13, 0x42, 0x1e, 0x84, 0xe7, 0xd2], mode=mode_choice)
     
     # --- Round 1 --------------------------------------------------------------
-    dec_data_hi_round_1 = AddRoundKey(dec_data_hi_round_1, key_hi_list[1])
-    dec_data_lo_round_1 = AddRoundKey(dec_data_lo_round_1, key_lo_list[1])
+    r1_time = time.time()
+    dec_data_hi_round_1 = AddRoundKey(engine_context, dec_data_hi_round_1, key_hi_list[1])
+    dec_data_lo_round_1 = AddRoundKey(engine_context, dec_data_lo_round_1, key_lo_list[1])
+    # noise reduction
+    dec_data_hi_round_1, dec_data_lo_round_1 = noise_reduction(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
+    r1_e_time = time.time()
     
     dec_data_hi_round_1, dec_data_lo_round_1 = inv_mix_columns(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
     
@@ -669,8 +829,8 @@ if __name__ == "__main__":
     dec_data_hi_round_2, dec_data_lo_round_2 = inv_sub_bytes(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
     
     # --- Round 2 --------------------------------------------------------------
-    dec_data_hi_round_2 = AddRoundKey(dec_data_hi_round_2, key_hi_list[2])
-    dec_data_lo_round_2 = AddRoundKey(dec_data_lo_round_2, key_lo_list[2])
+    dec_data_hi_round_2 = AddRoundKey(engine_context, dec_data_hi_round_2, key_hi_list[2])
+    dec_data_lo_round_2 = AddRoundKey(engine_context, dec_data_lo_round_2, key_lo_list[2])
     
     dec_data_hi_round_2, dec_data_lo_round_2 = inv_mix_columns(engine_context, dec_data_hi_round_2, dec_data_lo_round_2)
     
@@ -679,8 +839,8 @@ if __name__ == "__main__":
     dec_data_hi_round_3, dec_data_lo_round_3 = inv_sub_bytes(engine_context, dec_data_hi_round_2, dec_data_lo_round_2)
     
     # --- Round 3 --------------------------------------------------------------
-    dec_data_hi_round_3 = AddRoundKey(dec_data_hi_round_3, key_hi_list[3])
-    dec_data_lo_round_3 = AddRoundKey(dec_data_lo_round_3, key_lo_list[3])
+    dec_data_hi_round_3 = AddRoundKey(engine_context, dec_data_hi_round_3, key_hi_list[3])
+    dec_data_lo_round_3 = AddRoundKey(engine_context, dec_data_lo_round_3, key_lo_list[3])
     
     dec_data_hi_round_3, dec_data_lo_round_3 = inv_mix_columns(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
@@ -689,8 +849,8 @@ if __name__ == "__main__":
     dec_data_hi_round_4, dec_data_lo_round_4 = inv_sub_bytes(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
     # --- Round 4 --------------------------------------------------------------
-    dec_data_hi_round_4 = AddRoundKey(dec_data_hi_round_4, key_hi_list[4])
-    dec_data_lo_round_4 = AddRoundKey(dec_data_lo_round_4, key_lo_list[4])
+    dec_data_hi_round_4 = AddRoundKey(engine_context, dec_data_hi_round_4, key_hi_list[4])
+    dec_data_lo_round_4 = AddRoundKey(engine_context, dec_data_lo_round_4, key_lo_list[4])
     
     dec_data_hi_round_4, dec_data_lo_round_4 = inv_mix_columns(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
@@ -699,8 +859,8 @@ if __name__ == "__main__":
     dec_data_hi_round_5, dec_data_lo_round_5 = inv_sub_bytes(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
     # --- Round 5 --------------------------------------------------------------
-    dec_data_hi_round_5 = AddRoundKey(dec_data_hi_round_5, key_hi_list[5])
-    dec_data_lo_round_5 = AddRoundKey(dec_data_lo_round_5, key_lo_list[5])
+    dec_data_hi_round_5 = AddRoundKey(engine_context, dec_data_hi_round_5, key_hi_list[5])
+    dec_data_lo_round_5 = AddRoundKey(engine_context, dec_data_lo_round_5, key_lo_list[5])
     
     dec_data_hi_round_5, dec_data_lo_round_5 = inv_mix_columns(engine_context, dec_data_hi_round_5, dec_data_lo_round_5)
     
@@ -709,8 +869,8 @@ if __name__ == "__main__":
     dec_data_hi_round_6, dec_data_lo_round_6 = inv_sub_bytes(engine_context, dec_data_hi_round_5, dec_data_lo_round_5)
     
     # --- Round 6 --------------------------------------------------------------
-    dec_data_hi_round_6 = AddRoundKey(dec_data_hi_round_6, key_hi_list[6])
-    dec_data_lo_round_6 = AddRoundKey(dec_data_lo_round_6, key_lo_list[6])
+    dec_data_hi_round_6 = AddRoundKey(engine_context, dec_data_hi_round_6, key_hi_list[6])
+    dec_data_lo_round_6 = AddRoundKey(engine_context, dec_data_lo_round_6, key_lo_list[6])
     
     dec_data_hi_round_6, dec_data_lo_round_6 = inv_mix_columns(engine_context, dec_data_hi_round_6, dec_data_lo_round_6)
     
@@ -719,8 +879,8 @@ if __name__ == "__main__":
     dec_data_hi_round_7, dec_data_lo_round_7 = inv_sub_bytes(engine_context, dec_data_hi_round_6, dec_data_lo_round_6)
     
     # --- Round 7 --------------------------------------------------------------
-    dec_data_hi_round_7 = AddRoundKey(dec_data_hi_round_7, key_hi_list[7])
-    dec_data_lo_round_7 = AddRoundKey(dec_data_lo_round_7, key_lo_list[7])
+    dec_data_hi_round_7 = AddRoundKey(engine_context, dec_data_hi_round_7, key_hi_list[7])
+    dec_data_lo_round_7 = AddRoundKey(engine_context, dec_data_lo_round_7, key_lo_list[7])
     
     dec_data_hi_round_7, dec_data_lo_round_7 = inv_mix_columns(engine_context, dec_data_hi_round_7, dec_data_lo_round_7)
     
@@ -729,8 +889,8 @@ if __name__ == "__main__":
     dec_data_hi_round_8, dec_data_lo_round_8 = inv_sub_bytes(engine_context, dec_data_hi_round_7, dec_data_lo_round_7)
     
     # --- Round 8 --------------------------------------------------------------
-    dec_data_hi_round_8 = AddRoundKey(dec_data_hi_round_8, key_hi_list[8])
-    dec_data_lo_round_8 = AddRoundKey(dec_data_lo_round_8, key_lo_list[8])
+    dec_data_hi_round_8 = AddRoundKey(engine_context, dec_data_hi_round_8, key_hi_list[8])
+    dec_data_lo_round_8 = AddRoundKey(engine_context, dec_data_lo_round_8, key_lo_list[8])
     
     dec_data_hi_round_8, dec_data_lo_round_8 = inv_mix_columns(engine_context, dec_data_hi_round_8, dec_data_lo_round_8)
     
@@ -739,8 +899,8 @@ if __name__ == "__main__":
     dec_data_hi_round_9, dec_data_lo_round_9 = inv_sub_bytes(engine_context, dec_data_hi_round_8, dec_data_lo_round_8)
     
     # --- Round 9 --------------------------------------------------------------
-    dec_data_hi_round_9 = AddRoundKey(dec_data_hi_round_9, key_hi_list[9])
-    dec_data_lo_round_9 = AddRoundKey(dec_data_lo_round_9, key_lo_list[9])
+    dec_data_hi_round_9 = AddRoundKey(engine_context, dec_data_hi_round_9, key_hi_list[9])
+    dec_data_lo_round_9 = AddRoundKey(engine_context, dec_data_lo_round_9, key_lo_list[9])
     
     dec_data_hi_round_9, dec_data_lo_round_9 = inv_mix_columns(engine_context, dec_data_hi_round_9, dec_data_lo_round_9)
     
@@ -749,8 +909,8 @@ if __name__ == "__main__":
     dec_data_hi_round_10, dec_data_lo_round_10 = inv_sub_bytes(engine_context, dec_data_hi_round_9, dec_data_lo_round_9)
     
     # --- Round 10 --------------------------------------------------------------
-    dec_data_hi_round_10 = AddRoundKey(dec_data_hi_round_10, key_hi_list[10])
-    dec_data_lo_round_10 = AddRoundKey(dec_data_lo_round_10, key_lo_list[10])
+    dec_data_hi_round_10 = AddRoundKey(engine_context, dec_data_hi_round_10, key_hi_list[10])
+    dec_data_lo_round_10 = AddRoundKey(engine_context, dec_data_lo_round_10, key_lo_list[10])
     
     dec_data_hi = engine.decrypt(dec_data_hi_round_10, engine_context.get_secret_key())
     dec_data_lo = engine.decrypt(dec_data_lo_round_10, engine_context.get_secret_key())

@@ -42,12 +42,18 @@ def blocks_to_flat_array(blocks, max_blocks: int = 2048) -> np.ndarray:
         raise ValueError(f"Too many blocks ({n_blocks} > {max_blocks})")
 
     # Allocate 16 × max_blocks matrix, zero-initialised
-    # matrix = np.zeros((16, max_blocks), dtype=np.uint8)
-    # # Place the actual data – transpose to align bytes per position
-    # matrix[:, :n_blocks] = blocks.T
-    matrix = blocks.T
+    matrix = np.zeros((16, max_blocks), dtype=np.uint8)
     
-    print("column-major matrix: ", matrix)
+    # Reshape to 4x4 and transpose for AES column-major order
+    # Input: [0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34]
+    # 4x4: [[0x32, 0x43, 0xf6, 0xa8], [0x88, 0x5a, 0x30, 0x8d], [0x31, 0x31, 0x98, 0xa2], [0xe0, 0x37, 0x07, 0x34]]
+    # Transpose: [[0x32, 0x88, 0x31, 0xe0], [0x43, 0x5a, 0x31, 0x37], [0xf6, 0x30, 0x98, 0x07], [0xa8, 0x8d, 0xa2, 0x34]]
+    # Flatten: [0x32, 0x88, 0x31, 0xe0, 0x43, 0x5a, 0x31, 0x37, 0xf6, 0x30, 0x98, 0x07, 0xa8, 0x8d, 0xa2, 0x34]
+    blocks_4x4 = blocks.reshape(4, 4)
+    blocks_col_major = blocks_4x4.T.flatten()
+    
+    # Place the column-major data in the first column
+    matrix[:, 0] = blocks_col_major
 
     # Flatten row-wise so each byte position segment is contiguous
     return matrix.reshape(-1)
