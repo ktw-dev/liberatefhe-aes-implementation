@@ -216,6 +216,12 @@ def inv_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     rotated_rows_lo_4 = engine.add(rotated_rows_lo_3, rotated_row_lo_3_0)
     rotated_rows_lo = engine.add(rotated_rows_lo_4, rotated_row_lo_3_123)
     
+    rotated_rows_hi = engine.intt(rotated_rows_hi)
+    rotated_rows_lo = engine.intt(rotated_rows_lo)
+    
+    rotated_rows_hi = engine.bootstrap(rotated_rows_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rotated_rows_lo = engine.bootstrap(rotated_rows_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
     return rotated_rows_hi, rotated_rows_lo
 
 

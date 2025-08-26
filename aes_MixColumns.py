@@ -110,6 +110,9 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # 전체 bootstrap 연산 수행 후 반환
     mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
     mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
+    
+    mixed_ct_hi = engine.intt(mixed_ct_hi)
+    mixed_ct_lo = engine.intt(mixed_ct_lo)
 
     return mixed_ct_hi, mixed_ct_lo
 

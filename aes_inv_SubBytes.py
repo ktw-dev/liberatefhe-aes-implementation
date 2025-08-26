@@ -110,6 +110,9 @@ def inv_sbox_poly(ctx: CKKS_EngineContext, ct_hi_zeta: Any, ct_lo_zeta: Any) -> 
     res_hi = engine.bootstrap(res_hi, rlk, conj_key, ctx.get_bootstrap_key())
     res_lo = engine.bootstrap(res_lo, rlk, conj_key, ctx.get_bootstrap_key())
 
+    res_hi = engine.intt(res_hi)
+    res_lo = engine.intt(res_lo)
+
     return res_hi, res_lo
 
 # ----------------------------------------------------------------------

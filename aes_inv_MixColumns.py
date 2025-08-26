@@ -76,10 +76,9 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     
     two_ct_hi, two_ct_lo = gf_mult_11(engine_context, ct_hi_rot_list[0], ct_lo_rot_list[0])
     
-    three_ct_hi, three_ct_lo = gf_mult_13(engine_context, ct_hi_rot_list[1], ct_lo_rot_list[1]) # -8 * 2048 만큼 왼쪽으로 회전한 암호문
+    three_ct_hi, three_ct_lo = gf_mult_13(engine_context, ct_hi_rot_list[1], ct_lo_rot_list[1]) 
     
-    four_ct_hi, four_ct_lo = gf_mult_9(engine_context, ct_hi_rot_list[2], ct_lo_rot_list[2]) # -12 * 2048 만큼 왼쪽으로 회전한 암호문
-    
+    four_ct_hi, four_ct_lo = gf_mult_9(engine_context, ct_hi_rot_list[2], ct_lo_rot_list[2]) 
     
     # -------------------------------------------------------
     # ------------------ 3. Bootstrap 연산 -------------------
@@ -88,12 +87,6 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     one_ct_lo_bootstrap = engine.bootstrap(one_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     two_ct_hi_bootstrap = engine.bootstrap(two_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     two_ct_lo_bootstrap = engine.bootstrap(two_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    
-    # DEBUG
-    print(f"one_ct_hi_bootstrap.level: {one_ct_hi_bootstrap.level}")
-    print(f"two_ct_hi_bootstrap.level: {two_ct_hi_bootstrap.level}")
-    print(f"three_ct_hi.level: {three_ct_hi.level}")
-    print(f"four_ct_hi.level: {four_ct_hi.level}")
     
     # -------------------------------------------------------
     # -------------------- 3. XOR 연산 -----------------------
@@ -121,6 +114,9 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # 전체 bootstrap 연산 수행 후 반환
     mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
     mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
+    
+    mixed_ct_hi = engine.intt(mixed_ct_hi)
+    mixed_ct_lo = engine.intt(mixed_ct_lo)
     
     return mixed_ct_hi, mixed_ct_lo
 

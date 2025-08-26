@@ -140,7 +140,9 @@ def _sbox_poly(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any) -> Tu
 
     return hi_ct, lo_ct
 
-# API with context first
+# ----------------------------------------------------------------------
+# 4. 외부 공개 API
+# ----------------------------------------------------------------------
 def sub_bytes(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     """Public API wrapper matching previous signature."""
     return _sbox_poly(engine_context, ct_hi, ct_lo)
