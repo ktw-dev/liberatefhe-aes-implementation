@@ -31,7 +31,6 @@ def noise_reduction(engine_context, state, n=16):
         a = engine.bootstrap(a, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     a = engine.multiply(a, (1 + 1/n))
     
-    print("Noise Reduction Success !")
     out = engine.add(state, a)
     out = engine.bootstrap(out, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     out = engine.intt(out)
