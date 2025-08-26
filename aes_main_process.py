@@ -817,7 +817,7 @@ if __name__ == "__main__":
     r1_e_time = time.time()
     print(f"round 1 complete!!! Time taken: {(r1_e_time - r1_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_2, dec_data_lo_round_2, ground_truth= [0xeb, 0x59, 0x8b, 0x1b, 0x40, 0x2e, 0xa1, 0xc3, 0xf2, 0x38, 0x13, 0x42, 0x1e, 0x84, 0xe7, 0xd2], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_2, dec_data_lo_round_2, ground_truth= [0xea, 0x04, 0x65, 0x85, 0x83, 0x45, 0x5d, 0x96, 0x5c, 0x33, 0x98, 0xb0, 0xf0, 0x2d, 0xad, 0xc5], mode=mode_choice)
     
     # --- Round 2 --------------------------------------------------------------
     r2_time = time.time()
@@ -833,7 +833,7 @@ if __name__ == "__main__":
     r2_e_time = time.time()
     print(f"round 2 complete!!! Time taken: {(r2_e_time - r2_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_3, dec_data_lo_round_3, ground_truth= [0xea, 0x04, 0x65, 0x85, 0x83, 0x45, 0x5d, 0x96, 0x5c, 0x33, 0x98, 0xb0, 0xf0, 0x2d, 0xad, 0xc5], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_3, dec_data_lo_round_3, ground_truth= [0x5a, 0x19, 0xa3, 0x7a, 0x41, 0x49, 0xe0, 0x8c, 0x42, 0xdc, 0x19, 0x04, 0xb1, 0x1f, 0x65, 0x0c], mode=mode_choice)
     
     # --- Round 3 --------------------------------------------------------------
     r3_time = time.time()
@@ -849,7 +849,7 @@ if __name__ == "__main__":
     r3_e_time = time.time()
     print(f"round 3 complete!!! Time taken: {(r3_e_time - r3_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_4, dec_data_lo_round_4, ground_truth= [0x5a, 0x19, 0xa3, 0x7a, 0x41, 0x49, 0xe0, 0x8c, 0x42, 0xdc, 0x19, 0x04, 0xb1, 0x1f, 0x65, 0x0c], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_4, dec_data_lo_round_4, ground_truth= [0x26, 0x3d, 0xe8, 0xfd, 0x0e, 0x41, 0x64, 0xd2, 0x2e, 0xb7, 0x72, 0x8b, 0x17, 0x7d, 0xa9, 0x25], mode=mode_choice)
     
     # --- Round 4 --------------------------------------------------------------
     r4_time = time.time()
@@ -865,7 +865,7 @@ if __name__ == "__main__":
     r4_e_time = time.time()
     print(f"round 4 complete!!! Time taken: {(r4_e_time - r4_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_5, dec_data_lo_round_5, ground_truth= [0x26, 0x3d, 0xe8, 0xfd, 0x0e, 0x41, 0x64, 0xd2, 0x2e, 0xb7, 0x72, 0x8b, 0x17, 0x7d, 0xa9, 0x25], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_5, dec_data_lo_round_5, ground_truth= [0xf1, 0xc1, 0x7c, 0x5d, 0x00, 0x92, 0xc8, 0xb5, 0x6f, 0x4c, 0x8b, 0xd5, 0x55, 0xef, 0x32, 0x0c], mode=mode_choice)
     
     # --- Round 5 --------------------------------------------------------------
     r5_time = time.time()
@@ -881,7 +881,7 @@ if __name__ == "__main__":
     r5_e_time = time.time()
     print(f"round 5 complete!!! Time taken: {(r5_e_time - r5_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_6, dec_data_lo_round_6, ground_truth= [0xf1, 0xc1, 0x7c, 0x5d, 0x00, 0x92, 0xc8, 0xb5, 0x6f, 0x4c, 0x8b, 0xd5, 0x55, 0xef, 0x32, 0x0c], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_6, dec_data_lo_round_6, ground_truth= [0xe0, 0xc8, 0xd9, 0x85, 0x92, 0x63, 0xb1, 0xb8, 0x7f, 0x63, 0x35, 0xbe, 0xe8, 0xc0, 0x50, 0x01], mode=mode_choice)
     
     # --- Round 6 --------------------------------------------------------------
     r6_time = time.time()
@@ -897,7 +897,7 @@ if __name__ == "__main__":
     r6_e_time = time.time()
     print(f"round 6 complete!!! Time taken: {(r6_e_time - r6_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_7, dec_data_lo_round_7, ground_truth= [0xe0, 0xc8, 0xd9, 0x85, 0x92, 0x63, 0xb1, 0xb8, 0x7f, 0x63, 0x35, 0xbe, 0xe8, 0xc0, 0x50, 0x01], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_7, dec_data_lo_round_7, ground_truth= [0x48, 0x67, 0x4d, 0xd6, 0x6c, 0x1d, 0xe3, 0x5f, 0x4e, 0x9d, 0xb1, 0x58, 0xee, 0x0d, 0x38, 0xe7], mode=mode_choice)
     
     # --- Round 7 --------------------------------------------------------------
     r7_time = time.time()
@@ -913,7 +913,7 @@ if __name__ == "__main__":
     r7_e_time = time.time()
     print(f"round 7 complete!!! Time taken: {(r7_e_time - r7_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_8, dec_data_lo_round_8, ground_truth= [0x48, 0x67, 0x4d, 0xd6, 0x6c, 0x1d, 0xe3, 0x5f, 0x4e, 0x9d, 0xb1, 0x58, 0xee, 0x0d, 0x38, 0xe7], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_8, dec_data_lo_round_8, ground_truth= [0xaa, 0x61, 0x82, 0x68, 0x8f, 0xdd, 0xd2, 0x32, 0x5f, 0xe3, 0x4a, 0x46, 0x03, 0xef, 0xd2, 0x9a], mode=mode_choice)
     
     # --- Round 8 --------------------------------------------------------------
     r8_time = time.time()
@@ -929,7 +929,7 @@ if __name__ == "__main__":
     r8_e_time = time.time()
     print(f"round 8 complete!!! Time taken: {(r8_e_time - r8_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_9, dec_data_lo_round_9, ground_truth= [0xaa, 0x61, 0x82, 0x68, 0x8f, 0xdd, 0xd2, 0x32, 0x5f, 0xe3, 0x4a, 0x46, 0x03, 0xef, 0xd2, 0x9a], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_9, dec_data_lo_round_9, ground_truth= [0xa4, 0x68, 0x6b, 0x02, 0x9c, 0x9f, 0x5b, 0x6a, 0x7f, 0x35, 0xea, 0x50, 0xf2, 0x2b, 0x43, 0x49], mode=mode_choice)
     
     # --- Round 9 --------------------------------------------------------------
     r9_time = time.time()
@@ -945,7 +945,7 @@ if __name__ == "__main__":
     r9_e_time = time.time()
     print(f"round 9 complete!!! Time taken: {(r9_e_time - r9_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_9, dec_data_lo_round_9, ground_truth= [], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_10, dec_data_lo_round_10, ground_truth= [0x19, 0xa0, 0x9a, 0xe9, 0x3d, 0xf4, 0xc6, 0xf8, 0xe3, 0xe2, 0x8d, 0x48, 0xbe, 0x2b, 0x2a, 0x08], mode=mode_choice)
     
     # --- Round 10 --------------------------------------------------------------
     r10_time = time.time()
@@ -955,7 +955,7 @@ if __name__ == "__main__":
     r10_e_time = time.time()
     print(f"round 10 complete!!! Time taken: {(r10_e_time - r10_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_10, dec_data_lo_round_10, ground_truth= [], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_10, dec_data_lo_round_10, ground_truth= [0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34], mode=mode_choice)
     
     dec_data_hi = engine.decrypt(dec_data_hi_round_10, engine_context.get_secret_key())
     dec_data_lo = engine.decrypt(dec_data_lo_round_10, engine_context.get_secret_key())
