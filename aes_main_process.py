@@ -656,7 +656,7 @@ if __name__ == "__main__":
     r5_e_time = time.time()
     print(f"round 5 complete!!! Time taken: {(r5_e_time - r5_time)} seconds")
     
-    verify = verify_round_output(engine_context, enc_data_hi_round_5, enc_data_lo_round_5, ground_truth= [0xf1, 0xc1, 0x7c, 0x5d, 0x00, 0x92, 0xc8, 0xb5, 0x6f, 0x4c, 0x8b, 0xd5, 0x55, 0xef, 0x32, 0x0c], mode=mode_choice)
+    verify = verify_round_output(engine_context, enc_data_hi_round_6, enc_data_lo_round_6, ground_truth= [0xf1, 0xc1, 0x7c, 0x5d, 0x00, 0x92, 0xc8, 0xb5, 0x6f, 0x4c, 0x8b, 0xd5, 0x55, 0xef, 0x32, 0x0c], mode=mode_choice)
     
     # --- Round 6 --------------------------------------------------------------
     r6_time = time.time()
