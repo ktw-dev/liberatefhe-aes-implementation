@@ -368,10 +368,12 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
             # 4의 배수 x - 4의 배수 -1 번째 워드와 4의 배수 - 3 번째 워드를 xor 연산
             word_hi_i_minus_1 = engine.rotate(word_hi[i-1], engine_context.get_fixed_rotation_key(4 * 2048))
             word_lo_i_minus_1 = engine.rotate(word_lo[i-1], engine_context.get_fixed_rotation_key(4 * 2048))
+            word_hi_i_minus_1, word_lo_i_minus_1 = noise_reduction(engine_context, word_hi_i_minus_1, word_lo_i_minus_1)
             word_hi_i_minus_3 = word_hi[i-4]
             word_lo_i_minus_3 = word_lo[i-4]
             
             xor_hi, xor_lo = _xor(engine_context, word_hi_i_minus_1, word_lo_i_minus_1, word_hi_i_minus_3, word_lo_i_minus_3)
+            xor_hi, xor_lo = noise_reduction(engine_context, xor_hi, xor_lo)
             word_hi.append(xor_hi)
             word_lo.append(xor_lo)
 
@@ -525,14 +527,14 @@ if __name__ == "__main__":
         base = 4 * r
         # rotate words to their row positions (0, 1, 2, 3)
         w0_hi = key_hi_list[base + 0]
-        w1_hi = engine.rotate(key_hi_list[base + 1])
-        w2_hi = engine.rotate(key_hi_list[base + 2])
-        w3_hi = engine.rotate(key_hi_list[base + 3])
+        w1_hi = key_hi_list[base + 1]
+        w2_hi = key_hi_list[base + 2]
+        w3_hi = key_hi_list[base + 3]
 
         w0_lo = key_lo_list[base + 0]
-        w1_lo = engine.rotate(key_lo_list[base + 1])
-        w2_lo = engine.rotate(key_lo_list[base + 2])
-        w3_lo = engine.rotate(key_lo_list[base + 3])
+        w1_lo = key_lo_list[base + 1]
+        w2_lo = key_lo_list[base + 2]
+        w3_lo = key_lo_list[base + 3]
 
         # add rows to form a single 16-byte block
         block_hi = engine.add(engine.add(w0_hi, w1_hi), engine.add(w2_hi, w3_hi))
