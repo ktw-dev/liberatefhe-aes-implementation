@@ -434,22 +434,9 @@ def verify_round_output(
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    try:
-        n_str = input("Enter number of AES blocks (1–2048): ")
-        n_blocks = int(n_str)
-    except ValueError:
-        raise SystemExit("❌  Invalid integer input.")
-
-    # Enforce range 1–2048 inclusive for user input
-    if not (1 <= n_blocks <= 2048):
-        raise SystemExit("❌  Block count must be between 1 and 2048 inclusive.")
-
-    # --------------------------------------------------------------------
-    # Select operating mode (demo vs practice)
-    # --------------------------------------------------------------------
-    mode_choice = input("Select mode – 'demo' or 'practice': ").strip().lower()
-    if mode_choice not in {"demo", "practice"}:
-        raise SystemExit("❌  Invalid mode; expected 'demo' or 'practice'.")
+    # start with demo mode
+    n_blocks = 1
+    mode_choice = "demo"
     
     # --- Engine initiation stage -----------------------------------------------
     
