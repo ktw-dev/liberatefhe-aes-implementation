@@ -90,25 +90,21 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     
     # -------------------------------------------------------
     # -------------------- 3. XOR 연산 -----------------------
-    # -------------------------------------------------------
-    # 각 xor마다 level 5 감소
-    
+    # -------------------------------------------------------    
     # high nibble
     mixed_ct_hi = _xor_operation(engine_context, one_ct_hi_bootstrap, two_ct_hi_bootstrap)
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)
-    
-    # Bootstrap 연산 수행
+    # bootstrap 연산 수행
     mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)    
     mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
           
     # low nibble
     mixed_ct_lo = _xor_operation(engine_context, one_ct_lo_bootstrap, two_ct_lo_bootstrap)
-    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo)
-    
-    # Bootstrap 연산 수행
+    # bootstrap 연산 수행
     mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
+    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo)    
     mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, four_ct_lo)
     
     # 전체 bootstrap 연산 수행 후 반환
