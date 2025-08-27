@@ -57,28 +57,28 @@ waiting for the encryption stage module...
 --------------------------------
 
 
-round 0 complete!!! Time taken: 140.0161690711975 seconds
+round 0 complete!!! Time taken: 111.25586605072021 seconds
 gt:  [ 25 160 154 233  61 244 198 248 227 226 141  72 190  43  42   8]
 combined_bytes length:  16
 combined_bytes:  [ 25 160 154 233  61 244 198 248 227 226 141  72 190  43  42   8]
 ✓ verification passed
-sub_bytes complete!!! Time taken: 222.63274550437927 seconds
+sub_bytes complete!!! Time taken: 187.06269121170044 seconds
 gt:  [212 224 184  30  39 191 180  65  17 152  93  82 174 241 229  48]
 combined_bytes length:  16
 combined_bytes:  [212 224 184  30  39 191 180  65  17 152  93  82 174 241 229  48]
 ✓ verification passed
-shift_rows complete!!! Time taken: 113.78520369529724 seconds
+shift_rows complete!!! Time taken: 107.55425786972046 seconds
 gt:  [212 224 184  30 191 180  65  39  93  82  17 152  48 174 241 229]
 combined_bytes length:  16
 combined_bytes:  [212 224 184  30 191 180  65  39  93  82  17 152  48 174 241 229]
 ✓ verification passed
-mix_columns complete!!! Time taken: 292.5355043411255 seconds
+mix_columns complete!!! Time taken: 263.275648355484 seconds
 gt:  [  4 224  72  40 102 203 248   6 129  25 211  38 229 154 122  76]
 combined_bytes length:  16
 combined_bytes:  [  4 224  72  40 102 203 248   6 129  25 211  38 229 154 122  76]
 ✓ verification passed
-addkey complete!!! Time taken: 139.07664585113525 seconds
-round 1 complete!!! Time taken: 771.1275246143341 seconds
+addkey complete!!! Time taken: 140.65455770492554 seconds
+round 1 complete!!! Time taken: 700.1127734184265 seconds
 gt:  [164 104 107   2 156 159  91 106 127  53 234  80 242  43  67  73]
 combined_bytes length:  16
 combined_bytes:  [164 104 107   2 156 159  91 106 127  53 234  80 242  43  67  73]
@@ -95,49 +95,47 @@ gt:  [ 88  27 219  27  77  75 231 107 202  90 202 176 241 172 168 229]
 combined_bytes length:  16
 combined_bytes:  [ 88  27 219  27  77  75 231 107 202  90 202 176 241 172 168 229]
 ✓ verification passed
-round 2 complete!!! Time taken: 759.865229845047 seconds
+round 2 complete!!! Time taken: 732.0812201499939 seconds
 gt:  [170  97 130 104 143 221 210  50  95 227  74  70   3 239 210 154]
 combined_bytes length:  16
 combined_bytes:  [170  97 130 104 143 221 210  50  95 227  74  70   3 239 210 154]
 ✓ verification passed
-round 3 complete!!! Time taken: 746.7972619533539 seconds
+round 3 complete!!! Time taken: 751.1835370063782 seconds
 gt:  [ 72 103  77 214 108  29 227  95  78 157 177  88 238  13  56 231]
 combined_bytes length:  16
 combined_bytes:  [ 72 103  77 214 108  29 227  95  78 157 177  88 238  13  56 231]
 ✓ verification passed
-round 4 complete!!! Time taken: 744.889848947525 seconds
+round 4 complete!!! Time taken: 751.8689856529236 seconds
 gt:  [224 200 217 133 146  99 177 184 127  99  53 190 232 192  80   1]
 combined_bytes length:  16
 combined_bytes:  [224 200 217 133 146  99 177 184 127  99  53 190 232 192  80   1]
 ✓ verification passed
-round 5 complete!!! Time taken: 780.0890102386475 seconds
+round 5 complete!!! Time taken: 749.3914012908936 seconds
 gt:  [241 193 124  93   0 146 200 181 111  76 139 213  85 239  50  12]
 combined_bytes length:  16
-combined_bytes:  [ 37 189 182  76 209  17  58  76 169 209  51 192 173 104 142 176]
-⚠️  mismatch – needs review
-  expected: ['f1', 'c1', '7c', '5d', '00', '92', 'c8', 'b5', '6f', '4c', '8b', 'd5', '55', 'ef', '32', '0c']
-  got     : ['25', 'bd', 'b6', '4c', 'd1', '11', '3a', '4c', 'a9', 'd1', '33', 'c0', 'ad', '68', '8e', 'b0']
-round 6 complete!!! Time taken: 765.2755780220032 seconds
+combined_bytes:  [241 193 124  93   0 146 200 181 111  76 139 213  85 239  50  12]
+✓ verification passed
+round 6 complete!!! Time taken: 758.4839251041412 seconds
 gt:  [ 38  61 232 253  14  65 100 210  46 183 114 139  23 125 169  37]
 combined_bytes length:  16
 combined_bytes:  [ 38  61 232 253  14  65 100 210  46 183 114 139  23 125 169  37]
 ✓ verification passed
-round 7 complete!!! Time taken: 762.3431079387665 seconds
+round 7 complete!!! Time taken: 794.1719081401825 seconds
 gt:  [ 90  25 163 122  65  73 224 140  66 220  25   4 177  31 101  12]
 combined_bytes length:  16
 combined_bytes:  [ 90  25 163 122  65  73 224 140  66 220  25   4 177  31 101  12]
 ✓ verification passed
-round 8 complete!!! Time taken: 782.0307159423828 seconds
+round 8 complete!!! Time taken: 770.8912405967712 seconds
 gt:  [234   4 101 133 131  69  93 150  92  51 152 176 240  45 173 197]
 combined_bytes length:  16
 combined_bytes:  [234   4 101 133 131  69  93 150  92  51 152 176 240  45 173 197]
 ✓ verification passed
-round 9 complete!!! Time taken: 759.3571372032166 seconds
+round 9 complete!!! Time taken: 788.5876202583313 seconds
 gt:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
 combined_bytes length:  16
 combined_bytes:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
 ✓ verification passed
-round 10 complete!!! Time taken: 469.01396918296814 seconds
+round 10 complete!!! Time taken: 504.8125960826874 seconds
 gt:  [ 57   2 220  25  37 220  17 106 132   9 133  11  29 251 151  50]
 combined_bytes length:  16
 combined_bytes:  [ 57   2 220  25  37 220  17 106 132   9 133  11  29 251 151  50]
@@ -150,16 +148,22 @@ waiting for the decryption stage module...
 --------------------------------
 
 
+round 0 complete!!! Time taken: 494.87976026535034 seconds
+gt:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
+combined_bytes length:  16
+combined_bytes:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
+✓ verification passed
 Traceback (most recent call last):
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_main_process.py", line 786, in <module>
-    dec_data_hi_round_0 = AddRoundKey(engine_context, enc_data_hi, key_hi_list[0])
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_main_process.py", line 300, in AddRoundKey
-    enc_data = _xor_operation(engine_context, enc_data, key)
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_xor.py", line 114, in _xor_operation
-    base_y = build_power_basis(engine, enc_beta,  relin_key, conjugate_key)
+  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_main_process.py", line 811, in <module>
+    dec_data_hi_round_1, dec_data_lo_round_1 = inv_mix_columns(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
+                                               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_main_process.py", line 342, in inv_mix_columns
+    enc_data_hi, enc_data_lo = _inv_mix_columns(engine_context, enc_data_hi, enc_data_lo)
+                               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_inv_MixColumns.py", line 100, in inv_mix_columns
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
+  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_xor.py", line 113, in _xor_operation
+    base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key)
   File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_xor.py", line 54, in build_power_basis
     pos_basis = engine.make_power_basis(ct, 8, relin_key)  # list length 8
-TypeError: make_power_basis(): incompatible function arguments. The following argument types are supported:
-    1. (self: desilofhe.Engine, ciphertext: desilofhe.Ciphertext, max_power: typing.SupportsInt, relinearization_key: desilofhe.RelinearizationKey) -> list[desilofhe.Ciphertext]
-
-Invoked with: <desilofhe.Engine object at 0x7ee2326bd3f0>, [<desilofhe.Ciphertext object at 0x7ee2326be6f0>, <desilofhe.Ciphertext object at 0x7ee2326be4b0>, <desilofhe.Ciphertext object at 0x7ee2326be670>, <desilofhe.Ciphertext object at 0x7ee2326be5f0>, <desilofhe.Ciphertext object at 0x7ee2326be570>, <desilofhe.Ciphertext object at 0x7ee2326be4f0>, <desilofhe.Ciphertext object at 0x7ee2326be3f0>, <desilofhe.Ciphertext object at 0x7ee2326be370>, <desilofhe.Ciphertext object at 0x7ee2326be070>, <desilofhe.Ciphertext object at 0x7ee2326be0f0>, <desilofhe.Ciphertext object at 0x7ee2d2538070>], 8, <desilofhe.RelinearizationKey object at 0x7ee2d2521070>
+RuntimeError: Make Power Basis With Ciphertext: the level of the input ciphertext is less than the target level.
