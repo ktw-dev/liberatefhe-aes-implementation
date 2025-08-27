@@ -79,3 +79,51 @@ The data flow within the `_xor_operation` function is as follows:
     *   It computes the term `(base_x[i] * base_y[j]) * c_ij` using homomorphic multiplications (`engine.multiply`).
     *   This result is added to the total sum using homomorphic addition (`engine.add`).
 5.  **Output**: The function returns a single ciphertext that encrypts the zeta representation of the XORed result. This output ciphertext can then be used in subsequent homomorphic operations or be decrypted to reveal the final integer result.
+
+## Noise Reduction (`aes_noise_reduction.py`)
+
+The `aes_noise_reduction.py` script provides a function to manage and reduce the noise accumulated in a ciphertext during homomorphic operations. This is crucial for executing deep computational graphs, such as the multiple rounds in AES, without the noise overwhelming the signal and corrupting the result.
+
+### `noise_reduction(engine_context, state, n=16)`
+
+This is the primary function in the module. It applies a specific noise reduction algorithm to a given ciphertext.
+
+**Parameters:**
+
+-   `engine_context`: The context object holding the FHE engine and associated keys.
+-   `state`: The input ciphertext whose noise needs to be reduced.
+-   `n`: An integer parameter that controls the noise reduction process. It defaults to `16` and can also be `256`. This parameter influences the number of iterations (`p`) in the core loop.
+
+**Functionality and Data Flow:**
+
+The function implements a noise management technique that appears to be a custom polynomial approximation designed to recenter the ciphertext value and reduce its noise level. The process is as follows:
+
+1.  **Initialization**:
+    *   The FHE `engine` is retrieved from the `engine_context`.
+    *   The input `state` is copied to a variable `a` to preserve the original ciphertext.
+    *   An iteration parameter `p` is set based on `n`:
+        *   If `n` is 256, `p` is 8.
+        *   If `n` is 16, `p` is 4.
+
+2.  **Core Squaring Loop**:
+    *   The function iterates `p` times. In each iteration, it squares the `state` ciphertext using `engine.multiply(state, state, ...)`.
+    *   Before each multiplication, it checks if the ciphertext's level is 0. If it is, a `bootstrap` operation is performed to refresh the ciphertext, enabling further computations. This repeated squaring rapidly increases the magnitude of the underlying value, which is a key part of the noise reduction scheme.
+
+3.  **Polynomial Application**:
+    *   After the loop, the function computes two main terms that are later added together. This part of the process resembles the evaluation of a polynomial `f(x) = c1*x + c0` where `x` is the result of the squaring loop.
+    *   **First Term**:
+        1.  The result from the squaring loop (`state`) is multiplied by the original ciphertext (`a`).
+        2.  This product is then multiplied by the plaintext constant `(-1/n)`.
+    *   **Second Term**:
+        1.  The original ciphertext `a` is multiplied by the plaintext constant `(1 + 1/n)`.
+
+4.  **Final Combination and Output**:
+    *   The two terms are added together using `engine.add(state, a)`.
+    *   The final result is bootstrapped to ensure it is "fresh" and has minimal noise.
+    *   An `engine.intt` (Inverse Number Theoretic Transform) is applied, which is likely the final step to get the result back into a standard polynomial representation within the CKKS scheme.
+    *   The resulting ciphertext `out` is returned.
+
+Throughout this process, bootstrapping is performed whenever a ciphertext's level drops to 0, which is a standard practice in leveled FHE schemes to allow for arbitrary-depth computations.
+
+### noise_reduction과 doublefree
+aes_key_scheduling.py에서 noise_reduction을 사용하기 위해 _row_word, _sub_word, _rcon_xor, _xor의 '내부'에 noise_reduction을 추가했으나 이 과정을 거치고 return되며 double-free가 발생하였다. 이유는 알 수 없으나 함수 내 함수로 배치하는 경우 발생하는 것으로 판단하여 모든 noise_reduction 함수를 밖으로 배치하였다.
