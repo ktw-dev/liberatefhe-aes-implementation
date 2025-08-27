@@ -123,7 +123,6 @@ def inv_shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     fixed_rotation_key_list = [engine_context.get_fixed_rotation_key(i * 2048) for i in range(-3, 4) if i != 0]
     # -3 -2 -1 1 2 3
-    print(fixed_rotation_key_list)
     
     # -----------------------------------------------------------------------------
     # Load / cache plaintext masks -------------------------------------------------
