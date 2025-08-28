@@ -96,7 +96,10 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # bootstrap 연산 수행
     mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)    
+    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi)  
+    # bootstrap 연산 수행
+    mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
     mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
           
     # low nibble
@@ -104,7 +107,10 @@ def inv_mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # bootstrap 연산 수행
     mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
     
-    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo)    
+    mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, three_ct_lo) 
+    # bootstrap 연산 수행
+    mixed_ct_lo = engine.bootstrap(mixed_ct_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    
     mixed_ct_lo = _xor_operation(engine_context, mixed_ct_lo, four_ct_lo)
     
     # 전체 bootstrap 연산 수행 후 반환
