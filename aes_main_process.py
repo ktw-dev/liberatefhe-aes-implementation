@@ -853,12 +853,20 @@ if __name__ == "__main__":
     r3_time = time.time()
     dec_data_hi_round_3 = AddRoundKey(engine_context, dec_data_hi_round_3, key_hi_list[3])
     dec_data_lo_round_3 = AddRoundKey(engine_context, dec_data_lo_round_3, key_lo_list[3])
+    # noise reduction
+    dec_data_hi_round_3, dec_data_lo_round_3 = noise_reduction(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
     dec_data_hi_round_3, dec_data_lo_round_3 = inv_mix_columns(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
+    # noise reduction
+    dec_data_hi_round_3, dec_data_lo_round_3 = noise_reduction(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
     dec_data_hi_round_3, dec_data_lo_round_3 = inv_shift_rows(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
+    # noise reduction
+    dec_data_hi_round_3, dec_data_lo_round_3 = noise_reduction(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
     
     dec_data_hi_round_4, dec_data_lo_round_4 = inv_sub_bytes(engine_context, dec_data_hi_round_3, dec_data_lo_round_3)
+    # noise reduction
+    dec_data_hi_round_4, dec_data_lo_round_4 = noise_reduction(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
     r3_e_time = time.time()
     print(f"round 3 complete!!! Time taken: {(r3_e_time - r3_time)} seconds")
@@ -869,12 +877,20 @@ if __name__ == "__main__":
     r4_time = time.time()
     dec_data_hi_round_4 = AddRoundKey(engine_context, dec_data_hi_round_4, key_hi_list[4])
     dec_data_lo_round_4 = AddRoundKey(engine_context, dec_data_lo_round_4, key_lo_list[4])
+    # noise reduction
+    dec_data_hi_round_4, dec_data_lo_round_4 = noise_reduction(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
     dec_data_hi_round_4, dec_data_lo_round_4 = inv_mix_columns(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
+    # noise reduction
+    dec_data_hi_round_4, dec_data_lo_round_4 = noise_reduction(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
     dec_data_hi_round_4, dec_data_lo_round_4 = inv_shift_rows(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
+    # noise reduction
+    dec_data_hi_round_4, dec_data_lo_round_4 = noise_reduction(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
     
     dec_data_hi_round_5, dec_data_lo_round_5 = inv_sub_bytes(engine_context, dec_data_hi_round_4, dec_data_lo_round_4)
+    # noise reduction
+    dec_data_hi_round_5, dec_data_lo_round_5 = noise_reduction(engine_context, dec_data_hi_round_5, dec_data_lo_round_5)
     
     r4_e_time = time.time()
     print(f"round 4 complete!!! Time taken: {(r4_e_time - r4_time)} seconds")
