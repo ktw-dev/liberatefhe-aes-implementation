@@ -190,3 +190,6 @@ class CKKS_EngineContext:
     
     def get_engine(self):
         return self.engine
+    
+    def is_ciphertext(self, ct: Any) -> bool:
+        return isinstance(ct, "desilofhe.Ciphertext")
