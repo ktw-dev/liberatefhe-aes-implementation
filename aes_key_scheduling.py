@@ -101,8 +101,6 @@ def _rot_word(engine_context: CKKS_EngineContext, enc_key_hi, enc_key_lo):
     
     t_minus_1_word_hi = enc_key_hi
     t_minus_1_word_lo = enc_key_lo
-    
-    print("t_minus_1_word", _extract_bytes_hex(engine_context, t_minus_1_word_hi, t_minus_1_word_lo))
 
     # ------------------------------Rotating------------------------------
     rotated_word_hi = engine.rotate(t_minus_1_word_hi, engine_context.get_fixed_rotation_key(4 * 2048))
@@ -341,6 +339,8 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
     word_hi = enc_key_hi_list.copy()
     word_lo = enc_key_lo_list.copy()
     
+    total_start_time = time.time()
+    
         # key scheduling round 
     for i in range(4, 44):
         if i % 4 == 0:
@@ -379,6 +379,10 @@ def key_scheduling(engine_context, enc_key_hi_list, enc_key_lo_list):
 
             end_time = time.time()
             print(f"Key scheduling round {i} time: {end_time - start_time} seconds")
+    
+    total_end_time = time.time()
+    print(f"Key scheduling time: {total_end_time - total_start_time} seconds")
+    
     return word_hi, word_lo
 
 
