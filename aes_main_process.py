@@ -769,6 +769,8 @@ if __name__ == "__main__":
     
     verify = verify_round_output(engine_context, enc_data_hi, enc_data_lo, ground_truth= [0x39, 0x02, 0xdc, 0x19, 0x25, 0xdc, 0x11, 0x6a, 0x84, 0x09, 0x85, 0x0b, 0x1d, 0xfb, 0x97, 0x32], mode=mode_choice)
     
+    print(f"encryption stage complete!!! Time taken: {(r10_e_time - start_time)} seconds")
+
     wait_next_stage("encryption stage", "decryption stage")
 
     # --- Decryption stage ----------------------------------------------------
@@ -1027,7 +1029,7 @@ if __name__ == "__main__":
     r10_e_time = time.time()
     print(f"round 10 complete!!! Time taken: {(r10_e_time - r10_time)} seconds")
     
-    verify = verify_round_output(engine_context, dec_data_hi_round_10, dec_data_lo_round_10, ground_truth= [0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34], mode=mode_choice)
+    verify = verify_round_output(engine_context, dec_data_hi_round_10, dec_data_lo_round_10, ground_truth= [0x32, 0x88, 0x31, 0xe0, 0x43, 0x5a, 0x31, 0x37, 0xf6, 0x30, 0x98, 0x07, 0xa8, 0x8d, 0xa2, 0x34], mode=mode_choice)
     
     dec_data_hi = engine.decrypt(dec_data_hi_round_10, engine_context.get_secret_key())
     dec_data_lo = engine.decrypt(dec_data_lo_round_10, engine_context.get_secret_key())
@@ -1039,7 +1041,10 @@ if __name__ == "__main__":
 
     print(f"decryption complete!!! Time taken: {(r10_e_time - r0_time)} seconds")
 
-    print(f"decrypted data: {dec_data_int}")
+    sampled_16 = dec_data_int[0::2048][:16]
+    transposed_flat_16 = sampled_16.reshape(4, 4).T.flatten()
+    print("transpose(flat 4x4) of sampled 16:", transposed_flat_16)
+    print("transpose(flat 4x4) hex:", [f"{int(b):02x}" for b in transposed_flat_16])
     
     
 

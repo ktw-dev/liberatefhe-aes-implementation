@@ -1,4 +1,4 @@
-nohup: 입력 무시
+nohup: ignoring input
 create engine
 
 Creating [2048, 4096, 6144, 8192, 16384, -2048, -4096, -6144, -8192] fixed rotation keys
@@ -57,28 +57,29 @@ waiting for the encryption stage module...
 --------------------------------
 
 
-round 0 complete!!! Time taken: 111.25586605072021 seconds
+Encryption stage Start!!!
+round 0 complete!!! Time taken: 30.528204202651978 seconds
 gt:  [ 25 160 154 233  61 244 198 248 227 226 141  72 190  43  42   8]
 combined_bytes length:  16
 combined_bytes:  [ 25 160 154 233  61 244 198 248 227 226 141  72 190  43  42   8]
 ✓ verification passed
-sub_bytes complete!!! Time taken: 187.06269121170044 seconds
+sub_bytes complete!!! Time taken: 53.76860570907593 seconds
 gt:  [212 224 184  30  39 191 180  65  17 152  93  82 174 241 229  48]
 combined_bytes length:  16
 combined_bytes:  [212 224 184  30  39 191 180  65  17 152  93  82 174 241 229  48]
 ✓ verification passed
-shift_rows complete!!! Time taken: 107.55425786972046 seconds
+shift_rows complete!!! Time taken: 23.878599405288696 seconds
 gt:  [212 224 184  30 191 180  65  39  93  82  17 152  48 174 241 229]
 combined_bytes length:  16
 combined_bytes:  [212 224 184  30 191 180  65  39  93  82  17 152  48 174 241 229]
 ✓ verification passed
-mix_columns complete!!! Time taken: 263.275648355484 seconds
+mix_columns complete!!! Time taken: 67.29444289207458 seconds
 gt:  [  4 224  72  40 102 203 248   6 129  25 211  38 229 154 122  76]
 combined_bytes length:  16
 combined_bytes:  [  4 224  72  40 102 203 248   6 129  25 211  38 229 154 122  76]
 ✓ verification passed
-addkey complete!!! Time taken: 140.65455770492554 seconds
-round 1 complete!!! Time taken: 700.1127734184265 seconds
+addkey complete!!! Time taken: 29.550440311431885 seconds
+round 1 complete!!! Time taken: 175.23322463035583 seconds
 gt:  [164 104 107   2 156 159  91 106 127  53 234  80 242  43  67  73]
 combined_bytes length:  16
 combined_bytes:  [164 104 107   2 156 159  91 106 127  53 234  80 242  43  67  73]
@@ -95,47 +96,47 @@ gt:  [ 88  27 219  27  77  75 231 107 202  90 202 176 241 172 168 229]
 combined_bytes length:  16
 combined_bytes:  [ 88  27 219  27  77  75 231 107 202  90 202 176 241 172 168 229]
 ✓ verification passed
-round 2 complete!!! Time taken: 732.0812201499939 seconds
+round 2 complete!!! Time taken: 170.87320351600647 seconds
 gt:  [170  97 130 104 143 221 210  50  95 227  74  70   3 239 210 154]
 combined_bytes length:  16
 combined_bytes:  [170  97 130 104 143 221 210  50  95 227  74  70   3 239 210 154]
 ✓ verification passed
-round 3 complete!!! Time taken: 751.1835370063782 seconds
+round 3 complete!!! Time taken: 171.13037300109863 seconds
 gt:  [ 72 103  77 214 108  29 227  95  78 157 177  88 238  13  56 231]
 combined_bytes length:  16
 combined_bytes:  [ 72 103  77 214 108  29 227  95  78 157 177  88 238  13  56 231]
 ✓ verification passed
-round 4 complete!!! Time taken: 751.8689856529236 seconds
+round 4 complete!!! Time taken: 171.84217476844788 seconds
 gt:  [224 200 217 133 146  99 177 184 127  99  53 190 232 192  80   1]
 combined_bytes length:  16
 combined_bytes:  [224 200 217 133 146  99 177 184 127  99  53 190 232 192  80   1]
 ✓ verification passed
-round 5 complete!!! Time taken: 749.3914012908936 seconds
+round 5 complete!!! Time taken: 171.70877170562744 seconds
 gt:  [241 193 124  93   0 146 200 181 111  76 139 213  85 239  50  12]
 combined_bytes length:  16
 combined_bytes:  [241 193 124  93   0 146 200 181 111  76 139 213  85 239  50  12]
 ✓ verification passed
-round 6 complete!!! Time taken: 758.4839251041412 seconds
+round 6 complete!!! Time taken: 172.69324493408203 seconds
 gt:  [ 38  61 232 253  14  65 100 210  46 183 114 139  23 125 169  37]
 combined_bytes length:  16
 combined_bytes:  [ 38  61 232 253  14  65 100 210  46 183 114 139  23 125 169  37]
 ✓ verification passed
-round 7 complete!!! Time taken: 794.1719081401825 seconds
+round 7 complete!!! Time taken: 172.1395766735077 seconds
 gt:  [ 90  25 163 122  65  73 224 140  66 220  25   4 177  31 101  12]
 combined_bytes length:  16
 combined_bytes:  [ 90  25 163 122  65  73 224 140  66 220  25   4 177  31 101  12]
 ✓ verification passed
-round 8 complete!!! Time taken: 770.8912405967712 seconds
+round 8 complete!!! Time taken: 172.06549215316772 seconds
 gt:  [234   4 101 133 131  69  93 150  92  51 152 176 240  45 173 197]
 combined_bytes length:  16
 combined_bytes:  [234   4 101 133 131  69  93 150  92  51 152 176 240  45 173 197]
 ✓ verification passed
-round 9 complete!!! Time taken: 788.5876202583313 seconds
+round 9 complete!!! Time taken: 172.09880757331848 seconds
 gt:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
 combined_bytes length:  16
 combined_bytes:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
 ✓ verification passed
-round 10 complete!!! Time taken: 504.8125960826874 seconds
+round 10 complete!!! Time taken: 104.56337118148804 seconds
 gt:  [ 57   2 220  25  37 220  17 106 132   9 133  11  29 251 151  50]
 combined_bytes length:  16
 combined_bytes:  [ 57   2 220  25  37 220  17 106 132   9 133  11  29 251 151  50]
@@ -148,22 +149,59 @@ waiting for the decryption stage module...
 --------------------------------
 
 
-round 0 complete!!! Time taken: 494.87976026535034 seconds
+round 0 complete!!! Time taken: 107.35298371315002 seconds
 gt:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
 combined_bytes length:  16
 combined_bytes:  [235  89 139  27  64  46 161 195 242  56  19  66  30 132 231 210]
 ✓ verification passed
-Traceback (most recent call last):
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_main_process.py", line 811, in <module>
-    dec_data_hi_round_1, dec_data_lo_round_1 = inv_mix_columns(engine_context, dec_data_hi_round_1, dec_data_lo_round_1)
-                                               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_main_process.py", line 342, in inv_mix_columns
-    enc_data_hi, enc_data_lo = _inv_mix_columns(engine_context, enc_data_hi, enc_data_lo)
-                               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_inv_MixColumns.py", line 100, in inv_mix_columns
-    mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi)
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_xor.py", line 113, in _xor_operation
-    base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key)
-  File "/home/user/intern-develop/liberatefhe-aes-implementation/aes_xor.py", line 54, in build_power_basis
-    pos_basis = engine.make_power_basis(ct, 8, relin_key)  # list length 8
-RuntimeError: Make Power Basis With Ciphertext: the level of the input ciphertext is less than the target level.
+round 1 complete!!! Time taken: 245.29609155654907 seconds
+gt:  [234   4 101 133 131  69  93 150  92  51 152 176 240  45 173 197]
+combined_bytes length:  16
+combined_bytes:  [234   4 101 133 131  69  93 150  92  51 152 176 240  45 173 197]
+✓ verification passed
+round 2 complete!!! Time taken: 235.3458411693573 seconds
+gt:  [ 90  25 163 122  65  73 224 140  66 220  25   4 177  31 101  12]
+combined_bytes length:  16
+combined_bytes:  [ 90  25 163 122  65  73 224 140  66 220  25   4 177  31 101  12]
+✓ verification passed
+round 3 complete!!! Time taken: 236.88346481323242 seconds
+gt:  [ 38  61 232 253  14  65 100 210  46 183 114 139  23 125 169  37]
+combined_bytes length:  16
+combined_bytes:  [ 38  61 232 253  14  65 100 210  46 183 114 139  23 125 169  37]
+✓ verification passed
+round 4 complete!!! Time taken: 241.1156725883484 seconds
+gt:  [241 193 124  93   0 146 200 181 111  76 139 213  85 239  50  12]
+combined_bytes length:  16
+combined_bytes:  [241 193 124  93   0 146 200 181 111  76 139 213  85 239  50  12]
+✓ verification passed
+round 5 complete!!! Time taken: 240.52964282035828 seconds
+gt:  [224 200 217 133 146  99 177 184 127  99  53 190 232 192  80   1]
+combined_bytes length:  16
+combined_bytes:  [224 200 217 133 146  99 177 184 127  99  53 190 232 192  80   1]
+✓ verification passed
+round 6 complete!!! Time taken: 238.14275527000427 seconds
+gt:  [ 72 103  77 214 108  29 227  95  78 157 177  88 238  13  56 231]
+combined_bytes length:  16
+combined_bytes:  [ 72 103  77 214 108  29 227  95  78 157 177  88 238  13  56 231]
+✓ verification passed
+round 7 complete!!! Time taken: 229.73877358436584 seconds
+gt:  [170  97 130 104 143 221 210  50  95 227  74  70   3 239 210 154]
+combined_bytes length:  16
+combined_bytes:  [170  97 130 104 143 221 210  50  95 227  74  70   3 239 210 154]
+✓ verification passed
+round 8 complete!!! Time taken: 229.5220491886139 seconds
+gt:  [164 104 107   2 156 159  91 106 127  53 234  80 242  43  67  73]
+combined_bytes length:  16
+combined_bytes:  [164 104 107   2 156 159  91 106 127  53 234  80 242  43  67  73]
+✓ verification passed
+round 9 complete!!! Time taken: 230.01027655601501 seconds
+gt:  [ 25 160 154 233  61 244 198 248 227 226 141  72 190  43  42   8]
+combined_bytes length:  16
+combined_bytes:  [ 25 160 154 233  61 244 198 248 227 226 141  72 190  43  42   8]
+✓ verification passed
+round 10 complete!!! Time taken: 28.169801712036133 seconds
+gt:  [ 50  67 246 168 136  90  48 141  49  49 152 162 224  55   7  52]
+combined_bytes length:  16
+combined_bytes:  [ 50  67 246 168 136  90  48 141  49  49 152 162 224  55   7  52]
+✓ verification passed
+decryption complete!!! Time taken: 2264.568757534027 seconds
