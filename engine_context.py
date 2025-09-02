@@ -212,6 +212,15 @@ class CKKS_EngineContext:
     # ---------------------------------------------------------------------
     # CKKS operations wrapper
     # ---------------------------------------------------------------------
+    def ckks_encrypt(self, text, level=10):
+        return self.engine.encrypt(text, self.public_key, level=level)
+    
+    def ckks_decrypt(self, ct):
+        return self.engine.decrypt(ct, self.secret_key)
+    
+    def ckks_add(self, text1, text2):
+        return self.engine.add(text1, text2)
+    
     def ckks_bootstrap(self, text):
         bootstrap_ct = self.engine.bootstrap(text, self.relinearization_key, self.conjugation_key, self.bootstrap_key)
         bootstrap_ct = self.engine.intt(bootstrap_ct)
