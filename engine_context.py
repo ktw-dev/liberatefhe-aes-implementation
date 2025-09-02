@@ -36,9 +36,6 @@ class _FixedRotationKeyStore:
         self._sk = secret_key
         self._slot_count = slot_count
         self._cache: dict[int, "desilofhe.FixedRotationKey"] = {}
-        
-        # bootstrap count
-        self._bootstrap_count = 0
 
     # dict-style access: store[delta]
     def __getitem__(self, delta: int):
@@ -119,6 +116,9 @@ class CKKS_EngineContext:
         self.relinearization_key = self.engine.create_relinearization_key(self.secret_key)
         self.conjugation_key = self.engine.create_conjugation_key(self.secret_key)
         self.rotation_key = self.engine.create_rotation_key(self.secret_key)
+        
+        # bootstrap count
+        self._bootstrap_count = 0
 
         # Fixed rotation key store (lazy-loaded)
         self._fixed_rot_store = _FixedRotationKeyStore(self.engine, self.secret_key, self.engine.slot_count)
