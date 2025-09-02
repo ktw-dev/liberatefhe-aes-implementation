@@ -36,6 +36,9 @@ class _FixedRotationKeyStore:
         self._sk = secret_key
         self._slot_count = slot_count
         self._cache: dict[int, "desilofhe.FixedRotationKey"] = {}
+        
+        # bootstrap count
+        self._bootstrap_count = 0
 
     # dict-style access: store[delta]
     def __getitem__(self, delta: int):
@@ -191,6 +194,9 @@ class CKKS_EngineContext:
     def get_engine(self):
         return self.engine
     
+    # ---------------------------------------------------------------------
+    # Checkers
+    # ---------------------------------------------------------------------
     def is_ciphertext(self, ct: Any) -> bool:
         return ct.__class__.__name__ == "Ciphertext"
     
@@ -203,3 +209,43 @@ class CKKS_EngineContext:
     def is_public_key(self, pk: Any) -> bool:
         return pk.__class__.__name__ == "PublicKey"
     
+    # ---------------------------------------------------------------------
+    # CKKS operations wrapper
+    # ---------------------------------------------------------------------
+    def ckks_bootstrap(self, text):
+        bootstrap_ct = self.engine.bootstrap(text, self.relinearization_key, self.conjugation_key, self.bootstrap_key)
+        bootstrap_ct = self.engine.intt(bootstrap_ct)
+        self._bootstrap_count += 1
+        return bootstrap_ct
+    
+    def ckks_multiply(self, text1, text2, threshold=5):
+        engine = self.engine
+        is_ct = self.is_ciphertext
+
+        def needs_bootstrap(ct):
+            return ct.level <= threshold
+
+        # -------------------------------
+        # Pre-checks for level issues
+        # -------------------------------
+        if is_ct(text1) and is_ct(text2):
+            if text1.level != text2.level:
+                text1 = self.ckks_bootstrap(text1)
+                text2 = self.ckks_bootstrap(text2)
+            elif needs_bootstrap(text1) and needs_bootstrap(text2):
+                text1 = self.ckks_bootstrap(text1)
+                text2 = self.ckks_bootstrap(text2)
+
+        # -------------------------------
+        # Attempt multiply
+        # -------------------------------
+        try:
+            return engine.multiply(text1, text2, self.relinearization_key) if is_ct(text1) and is_ct(text2) else engine.multiply(text1, text2)
+        except RuntimeError as e:
+            if "level of the input ciphertext is less than the target level" in str(e):
+                if is_ct(text1):
+                    text1 = self.ckks_bootstrap(text1)
+                if is_ct(text2):
+                    text2 = self.ckks_bootstrap(text2)
+                return engine.multiply(text1, text2, self.relinearization_key) if is_ct(text1) and is_ct(text2) else engine.multiply(text1, text2)
+            raise
