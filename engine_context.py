@@ -154,19 +154,19 @@ class CKKS_EngineContext:
     def get_mode(self) -> str:
         return self.engine.mode
     
-    def get_public_key(self) -> "desilofhe.PublicKey":
+    def get_public_key(self):
         return self.public_key
     
-    def get_secret_key(self) -> "desilofhe.SecretKey":
+    def get_secret_key(self):
         return self.secret_key
     
-    def get_relinearization_key(self) -> "desilofhe.RelinearizationKey":
+    def get_relinearization_key(self):
         return self.relinearization_key
     
-    def get_conjugation_key(self) -> "desilofhe.ConjugationKey":
+    def get_conjugation_key(self):
         return self.conjugation_key
     
-    def get_rotation_key(self) -> "desilofhe.RotationKey":
+    def get_rotation_key(self):
         return self.rotation_key
     
     def get_fixed_rotation_key(self, delta: int | None = None):
@@ -192,4 +192,14 @@ class CKKS_EngineContext:
         return self.engine
     
     def is_ciphertext(self, ct: Any) -> bool:
-        return isinstance(ct, "desilofhe.Ciphertext")
+        return ct.__class__.__name__ == "Ciphertext"
+    
+    def is_plaintext(self, pt: Any) -> bool:
+        return pt.__class__.__name__ == "Plaintext"
+    
+    def is_secret_key(self, sk: Any) -> bool:
+        return sk.__class__.__name__ == "SecretKey"
+    
+    def is_public_key(self, pk: Any) -> bool:
+        return pk.__class__.__name__ == "PublicKey"
+    
