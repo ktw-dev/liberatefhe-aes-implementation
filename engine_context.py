@@ -221,8 +221,8 @@ class CKKS_EngineContext:
     def ckks_add(self, text1, text2):
         return self.engine.add(text1, text2)
     
-    def ckks_bootstrap(self, text):
-        bootstrap_ct = self.engine.bootstrap(text, self.relinearization_key, self.conjugation_key, self.bootstrap_key)
+    def ckks_bootstrap(self, ct):
+        bootstrap_ct = self.engine.bootstrap(ct, self.relinearization_key, self.conjugation_key, self.bootstrap_key)
         bootstrap_ct = self.engine.intt(bootstrap_ct)
         self._bootstrap_count += 1
         return bootstrap_ct
@@ -258,3 +258,9 @@ class CKKS_EngineContext:
                     text2 = self.ckks_bootstrap(text2)
                 return engine.multiply(text1, text2, self.relinearization_key) if is_ct(text1) and is_ct(text2) else engine.multiply(text1, text2)
             raise
+        
+    def ckks_power_basis(self, ct, degree):
+        return self.engine.make_power_basis(ct, degree, self.relinearization_key)
+    
+    def ckks_conjugate(self, ct):
+        return self.engine.conjugate(ct, self.conjugation_key)

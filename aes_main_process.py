@@ -18,8 +18,6 @@ Future work (place-holders):
 """
 from __future__ import annotations
 
-import pathlib
-import importlib.util
 import numpy as np
 import time
 from typing import Tuple, List, Any
@@ -32,7 +30,6 @@ from aes_key_array import key_to_flat_array
 from aes_transform_zeta import int_to_zeta, zeta_to_int
 from aes_xor import _xor_operation
 from aes_key_scheduling import key_scheduling
-from key_scheduling_numpy import key_expansion_flat_nibbles
 
 # operation modules
 from aes_inv_SubBytes import inv_sub_bytes as _inv_sub_bytes
