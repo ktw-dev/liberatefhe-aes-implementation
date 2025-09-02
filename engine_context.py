@@ -238,10 +238,7 @@ class CKKS_EngineContext:
         # Pre-checks for level issues
         # -------------------------------
         if is_ct(text1) and is_ct(text2):
-            if text1.level != text2.level:
-                text1 = self.ckks_bootstrap(text1)
-                text2 = self.ckks_bootstrap(text2)
-            elif needs_bootstrap(text1) and needs_bootstrap(text2):
+            if needs_bootstrap(text1) and needs_bootstrap(text2):
                 text1 = self.ckks_bootstrap(text1)
                 text2 = self.ckks_bootstrap(text2)
 
