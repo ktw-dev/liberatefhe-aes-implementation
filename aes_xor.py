@@ -27,22 +27,22 @@ COEFFS_JSON = Path(__file__).resolve().parent / "coeffs" / "xor_mono_coeffs.json
 # Utility functions
 # -----------------------------------------------------------------------------
 
-def ones_cipher(engine: Engine, template_ct):
+def ones_cipher(engine_context: CKKS_EngineContext, template_ct):
     """Return ciphertext with all slots = 1 matching scale/level of template_ct."""
     # Create zero ciphertext with same scale/level via scalar multiply
-    zero_ct = engine.multiply(template_ct, 0.0)  # keeps params, slots all 0
+    zero_ct = engine_context.ckks_multiply(template_ct, 0.0)  # keeps params, slots all 0
 
     try:
         # Preferred path if library supports add_plain
-        ones_ct = engine.add_plain(zero_ct, 1.0)
+        ones_ct = engine_context.ckks_add_plain(zero_ct, 1.0)
     except AttributeError:
         # Fallback: encode plaintext ones then add as ciphertext-plaintext
-        ones_pt = engine.encode(np.ones(engine.slot_count))
-        ones_ct = engine.add(zero_ct, ones_pt)
+        ones_pt = engine_context.ckks_encode(np.ones(engine_context.get_slot_count()))
+        ones_ct = engine_context.ckks_add(zero_ct, ones_pt)
     return ones_ct
 
 
-def build_power_basis(engine: Engine, ct, relin_key, conj_key):
+def build_power_basis(engine_context: CKKS_EngineContext, ct):
     """Return dict exp→ct for exponents 0‥15 using power_basis + conjugates.
 
     Steps:
@@ -51,17 +51,17 @@ def build_power_basis(engine: Engine, ct, relin_key, conj_key):
     3. Add exponent 0 as an encryption of the all-ones vector.
     """
     # Positive powers 1..8
-    pos_basis = engine.make_power_basis(ct, 8, relin_key)  # list length 8
+    pos_basis = engine_context.ckks_power_basis(ct, 8)  # list length 8
 
     basis: Dict[int, object] = {}
-    basis[0] = ones_cipher(engine, ct)
+    basis[0] = ones_cipher(engine_context, ct)
 
     for idx, c in enumerate(pos_basis, start=1):
         basis[idx] = c  # exponents 1..8
 
     # Negative powers: ct^-k  (k=1..7) → ct^(16-k)
     for k in range(1, 8):
-        conj_ct = engine.conjugate(pos_basis[k - 1], conj_key)  # ct^-k
+        conj_ct = engine_context.ckks_conjugate(pos_basis[k - 1])  # ct^-k
         basis[16 - k] = conj_ct  # exponents 15..9
 
     return basis
@@ -110,19 +110,19 @@ def _xor_operation(engine_context, enc_alpha, enc_beta):
     conjugate_key = engine_context.conjugation_key
     
     # 1. Build power bases
-    base_x = build_power_basis(engine, enc_alpha, relin_key, conjugate_key)
-    base_y = build_power_basis(engine, enc_beta,  relin_key, conjugate_key)
+    base_x = build_power_basis(engine_context, enc_alpha)
+    base_y = build_power_basis(engine_context, enc_beta)
 
     # 2. Pre-encoded polynomial coefficients
     coeff_pts = _get_coeff_plaintexts(engine)
     
     # 3. Evaluate polynomial securely
-    cipher_res = engine.multiply(enc_alpha, 0.0)
+    cipher_res = engine_context.ckks_multiply(enc_alpha, 0.0)
 
     for (i, j), coeff_pt in coeff_pts.items():
-        term = engine.multiply(base_x[i], base_y[j], relin_key)
-        term_res = engine.multiply(term, coeff_pt)
-        cipher_res = engine.add(cipher_res, term_res)
+        term = engine_context.ckks_multiply(base_x[i], base_y[j])
+        term_res = engine_context.ckks_multiply(term, coeff_pt)
+        cipher_res = engine_context.ckks_add(cipher_res, term_res)
            
     return cipher_res
 
