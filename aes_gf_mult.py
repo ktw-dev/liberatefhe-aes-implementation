@@ -87,22 +87,20 @@ def _poly_eval(
     which: str,
 ):
     engine = context.get_engine()
-    rlk = context.get_relinearization_key()
-    conj_key = context.get_conjugation_key()
 
     # power basis X^p, Y^q
-    basis_x = build_power_basis(engine, ct_hi, rlk, conj_key)  # 0..15
-    basis_y = build_power_basis(engine, ct_lo, rlk, conj_key)
+    basis_x = build_power_basis(context, ct_hi)  # 0..15
+    basis_y = build_power_basis(context, ct_lo)
 
     coeff_pt = _get_coeff_plaintexts(engine, mult_val, which)
 
     # init zero cipher
-    cipher_res = engine.multiply(ct_hi, 0.0)
+    cipher_res = context.ckks_multiply(ct_hi, 0.0)
 
     for (p, q), pt in coeff_pt.items():
-        term = engine.multiply(basis_x[p], basis_y[q], rlk)
-        term = engine.multiply(term, pt)
-        cipher_res = engine.add(cipher_res, term)
+        term = context.ckks_multiply(basis_x[p], basis_y[q])
+        term = context.ckks_multiply(term, pt)
+        cipher_res = context.ckks_add(cipher_res, term)
 
     return cipher_res
 
