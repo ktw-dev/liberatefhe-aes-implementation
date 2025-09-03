@@ -34,10 +34,10 @@ def ones_cipher(engine_context: CKKS_EngineContext, template_ct):
 
     try:
         # Preferred path if library supports add_plain
-        ones_ct = engine_context.ckks_add_plain(zero_ct, 1.0)
+        ones_ct = engine_context.ckks_add(zero_ct, 1.0)
     except AttributeError:
         # Fallback: encode plaintext ones then add as ciphertext-plaintext
-        ones_pt = engine_context.ckks_encode(np.ones(engine_context.get_slot_count()))
+        ones_pt = engine_context.get_engine().encode(np.ones(engine_context.get_slot_count()))
         ones_ct = engine_context.ckks_add(zero_ct, ones_pt)
     return ones_ct
 
