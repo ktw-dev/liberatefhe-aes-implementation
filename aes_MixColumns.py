@@ -92,8 +92,8 @@ def mix_columns(engine_context: CKKS_EngineContext, ct_hi: Any, ct_lo: Any):
     # high nibble
     mixed_ct_hi = _xor_operation(engine_context, one_ct_hi, two_ct_hi) # level 5 감소
     
-    # bootstrap 연산 수행
-    mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
+    # # bootstrap 연산 수행
+    # mixed_ct_hi = engine.bootstrap(mixed_ct_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key()) # level 10 복귀
     
     mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, three_ct_hi) # level 5 감소    
     mixed_ct_hi = _xor_operation(engine_context, mixed_ct_hi, four_ct_hi) # level 5 감소

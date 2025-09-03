@@ -104,9 +104,7 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     - Row 3: left shift by 3 positions
     
     모든 연산은 masking_plaintext 연산과 rotate 연산을 사용한다.
-    """
-    engine = engine_context.engine
-    
+    """    
     # -----------------------------------------------------------------------------
     # engine_context.get_fixed_rotation_key
     # -----------------------------------------------------------------------------
@@ -129,84 +127,81 @@ def shift_rows(engine_context: CKKS_EngineContext, ct_hi, ct_lo):
     # -----------------------------------------------------------------------------
     # masking operation of High nibble
     # -----------------------------------------------------------------------------
-    masked_row_hi_0 = engine.multiply(ct_hi, row_0_mask_plaintext)
+    masked_row_hi_0 = engine_context.ckks_multiply(ct_hi, row_0_mask_plaintext)
     
-    masked_row_hi_1_0 = engine.multiply(ct_hi, row_1_0_mask_plaintext)
-    masked_row_hi_1_123 = engine.multiply(ct_hi, row_1_123_mask_plaintext)
+    masked_row_hi_1_0 = engine_context.ckks_multiply(ct_hi, row_1_0_mask_plaintext)
+    masked_row_hi_1_123 = engine_context.ckks_multiply(ct_hi, row_1_123_mask_plaintext)
     
-    masked_row_hi_2_01 = engine.multiply(ct_hi, row_2_01_mask_plaintext)
-    masked_row_hi_2_23 = engine.multiply(ct_hi, row_2_23_mask_plaintext)
+    masked_row_hi_2_01 = engine_context.ckks_multiply(ct_hi, row_2_01_mask_plaintext)
+    masked_row_hi_2_23 = engine_context.ckks_multiply(ct_hi, row_2_23_mask_plaintext)
     
-    masked_row_hi_3_012 = engine.multiply(ct_hi, row_3_012_mask_plaintext)
-    masked_row_hi_3_3 = engine.multiply(ct_hi, row_3_3_mask_plaintext)
+    masked_row_hi_3_012 = engine_context.ckks_multiply(ct_hi, row_3_012_mask_plaintext)
+    masked_row_hi_3_3 = engine_context.ckks_multiply(ct_hi, row_3_3_mask_plaintext)
     
     # -----------------------------------------------------------------------------
     # masking operation of Low nibble
     # -----------------------------------------------------------------------------
-    masked_row_lo_0 = engine.multiply(ct_lo, row_0_mask_plaintext)
+    masked_row_lo_0 = engine_context.ckks_multiply(ct_lo, row_0_mask_plaintext)
     
-    masked_row_lo_1_0 = engine.multiply(ct_lo, row_1_0_mask_plaintext)
-    masked_row_lo_1_123 = engine.multiply(ct_lo, row_1_123_mask_plaintext)
+    masked_row_lo_1_0 = engine_context.ckks_multiply(ct_lo, row_1_0_mask_plaintext)
+    masked_row_lo_1_123 = engine_context.ckks_multiply(ct_lo, row_1_123_mask_plaintext)
     
-    masked_row_lo_2_01 = engine.multiply(ct_lo, row_2_01_mask_plaintext)
-    masked_row_lo_2_23 = engine.multiply(ct_lo, row_2_23_mask_plaintext)
+    masked_row_lo_2_01 = engine_context.ckks_multiply(ct_lo, row_2_01_mask_plaintext)
+    masked_row_lo_2_23 = engine_context.ckks_multiply(ct_lo, row_2_23_mask_plaintext)
     
-    masked_row_lo_3_012 = engine.multiply(ct_lo, row_3_012_mask_plaintext)
-    masked_row_lo_3_3 = engine.multiply(ct_lo, row_3_3_mask_plaintext)
+    masked_row_lo_3_012 = engine_context.ckks_multiply(ct_lo, row_3_012_mask_plaintext)
+    masked_row_lo_3_3 = engine_context.ckks_multiply(ct_lo, row_3_3_mask_plaintext)
     
     # -----------------------------------------------------------------------------
     # rotate operation of High nibble
     # -----------------------------------------------------------------------------
     # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
     # mask_row_1에 대해 0은 3 로 한번, 123은 -1로 한 번 회전
-    rotated_row_hi_1_0 = engine.rotate(masked_row_hi_1_0, fixed_rotation_key_list[5])
-    rotated_row_hi_1_123 = engine.rotate(masked_row_hi_1_123, fixed_rotation_key_list[2])
+    rotated_row_hi_1_0 = engine_context.ckks_fixed_rotate(masked_row_hi_1_0, fixed_rotation_key_list[5])
+    rotated_row_hi_1_123 = engine_context.ckks_fixed_rotate(masked_row_hi_1_123, fixed_rotation_key_list[2])
     
     # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
-    rotated_row_hi_2_01 = engine.rotate(masked_row_hi_2_01, fixed_rotation_key_list[4])
-    rotated_row_hi_2_23 = engine.rotate(masked_row_hi_2_23, fixed_rotation_key_list[1])
+    rotated_row_hi_2_01 = engine_context.ckks_fixed_rotate(masked_row_hi_2_01, fixed_rotation_key_list[4])
+    rotated_row_hi_2_23 = engine_context.ckks_fixed_rotate(masked_row_hi_2_23, fixed_rotation_key_list[1])
     
     # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
-    rotated_row_hi_3_012 = engine.rotate(masked_row_hi_3_012, fixed_rotation_key_list[3])
-    rotated_row_hi_3_3 = engine.rotate(masked_row_hi_3_3, fixed_rotation_key_list[0])
+    rotated_row_hi_3_012 = engine_context.ckks_fixed_rotate(masked_row_hi_3_012, fixed_rotation_key_list[3])
+    rotated_row_hi_3_3 = engine_context.ckks_fixed_rotate(masked_row_hi_3_3, fixed_rotation_key_list[0])
     
     # concatenate all the rotated rows
-    rotated_rows_hi_0 = engine.add(masked_row_hi_0, rotated_row_hi_1_0)
-    rotated_rows_hi_1 = engine.add(rotated_rows_hi_0, rotated_row_hi_1_123)
-    rotated_rows_hi_2 = engine.add(rotated_rows_hi_1, rotated_row_hi_2_01)
-    rotated_rows_hi_3 = engine.add(rotated_rows_hi_2, rotated_row_hi_2_23)
-    rotated_rows_hi_4 = engine.add(rotated_rows_hi_3, rotated_row_hi_3_012)
-    rotated_rows_hi = engine.add(rotated_rows_hi_4, rotated_row_hi_3_3)
+    rotated_rows_hi_0 = engine_context.ckks_add(masked_row_hi_0, rotated_row_hi_1_0)
+    rotated_rows_hi_1 = engine_context.ckks_add(rotated_rows_hi_0, rotated_row_hi_1_123)
+    rotated_rows_hi_2 = engine_context.ckks_add(rotated_rows_hi_1, rotated_row_hi_2_01)
+    rotated_rows_hi_3 = engine_context.ckks_add(rotated_rows_hi_2, rotated_row_hi_2_23)
+    rotated_rows_hi_4 = engine_context.ckks_add(rotated_rows_hi_3, rotated_row_hi_3_012)
+    rotated_rows_hi = engine_context.ckks_add(rotated_rows_hi_4, rotated_row_hi_3_3)
     
     # -----------------------------------------------------------------------------
     # rotate operation of Low nibble
     # -----------------------------------------------------------------------------
     # fixed_rotation_key_list 내용물은 -3 -2 -1 1 2 3 이렇게 저장됨.
     # mask_row_1에 대해 0은 3로 한번, 123은 -1로 한 번 회전
-    rotated_row_lo_1_0 = engine.rotate(masked_row_lo_1_0, fixed_rotation_key_list[5])
-    rotated_row_lo_1_123 = engine.rotate(masked_row_lo_1_123, fixed_rotation_key_list[2])
+    rotated_row_lo_1_0 = engine_context.ckks_fixed_rotate(masked_row_lo_1_0, fixed_rotation_key_list[5])
+    rotated_row_lo_1_123 = engine_context.ckks_fixed_rotate(masked_row_lo_1_123, fixed_rotation_key_list[2])
     
     # mask_row_2에 대해 01은 2로 한번, 23은 -2로 한 번 회전
-    rotated_row_lo_2_01 = engine.rotate(masked_row_lo_2_01, fixed_rotation_key_list[4])
-    rotated_row_lo_2_23 = engine.rotate(masked_row_lo_2_23, fixed_rotation_key_list[1])
+    rotated_row_lo_2_01 = engine_context.ckks_fixed_rotate(masked_row_lo_2_01, fixed_rotation_key_list[4])
+    rotated_row_lo_2_23 = engine_context.ckks_fixed_rotate(masked_row_lo_2_23, fixed_rotation_key_list[1])
     
     # mask_row_3에 대해 012는 1로 한번, 3은 -3로 한 번 회전
-    rotated_row_lo_3_012 = engine.rotate(masked_row_lo_3_012, fixed_rotation_key_list[3])
-    rotated_row_lo_3_3 = engine.rotate(masked_row_lo_3_3, fixed_rotation_key_list[0])
+    rotated_row_lo_3_012 = engine_context.ckks_fixed_rotate(masked_row_lo_3_012, fixed_rotation_key_list[3])
+    rotated_row_lo_3_3 = engine_context.ckks_fixed_rotate(masked_row_lo_3_3, fixed_rotation_key_list[0])
     
     # concatenate all the rotated rows
-    rotated_rows_lo_0 = engine.add(masked_row_lo_0, rotated_row_lo_1_0)
-    rotated_rows_lo_1 = engine.add(rotated_rows_lo_0, rotated_row_lo_1_123)
-    rotated_rows_lo_2 = engine.add(rotated_rows_lo_1, rotated_row_lo_2_01)
-    rotated_rows_lo_3 = engine.add(rotated_rows_lo_2, rotated_row_lo_2_23)
-    rotated_rows_lo_4 = engine.add(rotated_rows_lo_3, rotated_row_lo_3_012)
-    rotated_rows_lo = engine.add(rotated_rows_lo_4, rotated_row_lo_3_3)
+    rotated_rows_lo_0 = engine_context.ckks_add(masked_row_lo_0, rotated_row_lo_1_0)
+    rotated_rows_lo_1 = engine_context.ckks_add(rotated_rows_lo_0, rotated_row_lo_1_123)
+    rotated_rows_lo_2 = engine_context.ckks_add(rotated_rows_lo_1, rotated_row_lo_2_01)
+    rotated_rows_lo_3 = engine_context.ckks_add(rotated_rows_lo_2, rotated_row_lo_2_23)
+    rotated_rows_lo_4 = engine_context.ckks_add(rotated_rows_lo_3, rotated_row_lo_3_012)
+    rotated_rows_lo = engine_context.ckks_add(rotated_rows_lo_4, rotated_row_lo_3_3)
     
-    rotated_rows_hi = engine.intt(rotated_rows_hi)
-    rotated_rows_lo = engine.intt(rotated_rows_lo)
-    
-    rotated_rows_hi = engine.bootstrap(rotated_rows_hi, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    rotated_rows_lo = engine.bootstrap(rotated_rows_lo, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+    rotated_rows_hi = engine_context.ckks_bootstrap(rotated_rows_hi)
+    rotated_rows_lo = engine_context.ckks_bootstrap(rotated_rows_lo)
 
     return rotated_rows_hi, rotated_rows_lo
 

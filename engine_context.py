@@ -194,6 +194,9 @@ class CKKS_EngineContext:
     def get_engine(self):
         return self.engine
     
+    def get_bootstrap_count(self):
+        return self._bootstrap_count
+    
     # ---------------------------------------------------------------------
     # Checkers
     # ---------------------------------------------------------------------
@@ -261,3 +264,6 @@ class CKKS_EngineContext:
     
     def ckks_conjugate(self, ct):
         return self.engine.conjugate(ct, self.conjugation_key)
+    
+    def ckks_fixed_rotate(self, ct, fixed_rotation_key):
+        return self.engine.rotate(ct, fixed_rotation_key)

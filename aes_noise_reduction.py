@@ -1,8 +1,8 @@
 ## example code for noise reduction
 
-def noise_reduction(engine_context, state, n=16):
-    engine = engine_context.get_engine()
-    
+from engine_context import CKKS_EngineContext
+
+def noise_reduction(engine_context: CKKS_EngineContext, state, n=16):    
     a = state
     
     if n == 256:
@@ -13,30 +13,28 @@ def noise_reduction(engine_context, state, n=16):
         
     for _ in range (p):
         if state.level == 0:
-            state = engine.bootstrap(state, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-        state = engine.multiply(state, state, engine_context.get_relinearization_key())
+            state = engine_context.ckks_bootstrap(state)
+        state = engine_context.ckks_multiply(state, state)
         
     if state.level == 0:
-        state = engine.bootstrap(state, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
+        state = engine_context.ckks_bootstrap(state)
         
     if a.level == 0:
-        a = engine.bootstrap(a, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    state = engine.multiply(state, a, engine_context.get_relinearization_key())
+        a = engine_context.ckks_bootstrap(a)
+    state = engine_context.ckks_multiply(state, a)
         
     if state.level == 0:
-        state = engine.bootstrap(state, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    state = engine.multiply(state, (-1/n))
+        state = engine_context.ckks_bootstrap(state)
+    state = engine_context.ckks_multiply(state, (-1/n))
         
     if a.level == 0:
-        a = engine.bootstrap(a, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    a = engine.multiply(a, (1 + 1/n))
+        a = engine_context.ckks_bootstrap(a)
+    a = engine_context.ckks_multiply(a, (1 + 1/n))
     
-    out = engine.add(state, a)
-    out = engine.bootstrap(out, engine_context.get_relinearization_key(), engine_context.get_conjugation_key(), engine_context.get_bootstrap_key())
-    out = engine.intt(out)
+    out = engine_context.ckks_add(state, a)
+    out = engine_context.ckks_bootstrap(out)
     
     return out
-
 
 if __name__ == "__main__":
     ## how to use the noise reduction function

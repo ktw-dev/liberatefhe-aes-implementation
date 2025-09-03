@@ -90,9 +90,7 @@ def _build_power_basis(engine_context: CKKS_EngineContext, ct):
     1. `engine.make_power_basis(ct, 8, relin_key)` → ct^1..ct^8.
     2. Conjugate the first 7 powers to obtain ct^-1..ct^-7 ≡ ct^15..ct^9.
     3. Add exponent 0 as an encryption of the all-ones vector.
-    """
-    engine = engine_context.get_engine()
-    
+    """    
     # Positive powers 1..8
     pos_basis = engine_context.ckks_power_basis(ct, 8)  # list length 8
 
