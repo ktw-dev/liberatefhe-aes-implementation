@@ -225,6 +225,7 @@ class CKKS_EngineContext:
         return self.engine.add(text1, text2)
     
     def ckks_bootstrap(self, ct):
+        ct = self.engine.intt(ct)
         bootstrap_ct = self.engine.bootstrap(ct, self.relinearization_key, self.conjugation_key, self.bootstrap_key)
         bootstrap_ct = self.engine.intt(bootstrap_ct)
         self._bootstrap_count += 1
