@@ -22,6 +22,7 @@ from desilofhe import Engine
 
 __all__ = ["FHEContext"]
 
+known_bootstrap_errors = ["level of the input ciphertext is less than the target level", "input ciphertext should have a positive level"]
 
 class _FixedRotationKeyStore:
     """Lazy cache mapping rotation deltas (int, can be negative) to FixedRotationKey.
@@ -241,7 +242,8 @@ class CKKS_EngineContext:
         try:
             return engine.multiply(text1, text2, self.relinearization_key) if is_ct(text1) and is_ct(text2) else engine.multiply(text1, text2)
         except RuntimeError as e:
-            if "level of the input ciphertext is less than the target level" in str(e):
+            err_msg = str(e)
+            if any(err_str in err_msg for err_str in known_bootstrap_errors):
                 if is_ct(text1):
                     text1 = self.ckks_bootstrap(text1)
                 if is_ct(text2):

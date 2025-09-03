@@ -30,11 +30,11 @@ COEFFS_JSON = Path(__file__).resolve().parent / "coeffs" / "xor_mono_coeffs.json
 def ones_cipher(engine_context: CKKS_EngineContext, template_ct):
     """Return ciphertext with all slots = 1 matching scale/level of template_ct."""
     # Create zero ciphertext with same scale/level via scalar multiply
-    zero_ct = engine_context.ckks_multiply(template_ct, 0.0)  # keeps params, slots all 0
+    zero_ct = engine_context.ckks_multiply(template_ct, 0)  # keeps params, slots all 0
 
     try:
         # Preferred path if library supports add_plain
-        ones_ct = engine_context.ckks_add(zero_ct, 1.0)
+        ones_ct = engine_context.ckks_add(zero_ct, 1)
     except AttributeError:
         # Fallback: encode plaintext ones then add as ciphertext-plaintext
         ones_pt = engine_context.get_engine().encode(np.ones(engine_context.get_slot_count()))
@@ -74,7 +74,6 @@ def _load_coeffs(path=COEFFS_JSON):
             for i, j, r, im in data["entries"] if r or im}
 
 @lru_cache(maxsize=1)
-
 def _coeff_plaintexts(slot_count: int):
     """Return dict[(i,j)] -> plaintext (encoded complex coeff) for given slot count."""
     coeffs = _load_coeffs()
