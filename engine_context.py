@@ -231,21 +231,10 @@ class CKKS_EngineContext:
         self._bootstrap_count += 1
         return bootstrap_ct
     
-    def ckks_multiply(self, text1, text2, threshold=5):
+    def ckks_multiply(self, text1, text2):
         engine = self.engine
         is_ct = self.is_ciphertext
-
-        def needs_bootstrap(ct):
-            return ct.level <= threshold
-
-        # -------------------------------
-        # Pre-checks for level issues
-        # -------------------------------
-        if is_ct(text1) and is_ct(text2):
-            if needs_bootstrap(text1) and needs_bootstrap(text2):
-                text1 = self.ckks_bootstrap(text1)
-                text2 = self.ckks_bootstrap(text2)
-
+        
         # -------------------------------
         # Attempt multiply
         # -------------------------------
@@ -261,7 +250,13 @@ class CKKS_EngineContext:
             raise
         
     def ckks_power_basis(self, ct, degree):
-        return self.engine.make_power_basis(ct, degree, self.relinearization_key)
+        try:
+            return self.engine.make_power_basis(ct, degree, self.relinearization_key)
+        except RuntimeError as e:
+            if "level of the input ciphertext is less than the target level" in str(e):
+                ct = self.ckks_bootstrap(ct)
+                return self.engine.make_power_basis(ct, degree, self.relinearization_key)
+            raise
     
     def ckks_conjugate(self, ct):
         return self.engine.conjugate(ct, self.conjugation_key)
